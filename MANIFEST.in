@@ -1,0 +1,6 @@
+include LICENSE
+include README.rst
+include requirements.txt
+recursive-include nets_core/static *
+recursive-include nets_core/templates/nets_core *
+recursive-include docs *
