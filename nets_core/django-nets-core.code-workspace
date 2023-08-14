@@ -8,6 +8,7 @@
 		}
 	],
 	"settings": {
-		"workbench.colorTheme": "Tomorrow Night Blue"
+		"workbench.colorTheme": "Tomorrow Night Blue",
+		"esbonio.sphinx.confDir": ""
 	}
 }

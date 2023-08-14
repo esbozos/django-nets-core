@@ -1,4 +1,5 @@
 from functools import wraps
+import logging
 
 from django.http.response import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +9,9 @@ from nets_core.params import RequestParam
 from nets_core.responses import permission_denied
 from nets_core.utils import get_client_ip
 from django.utils.translation import gettext_lazy as _
+
+
+logger = logging.getLogger(__name__)
 
 def request_handler(
     obj=None, 
@@ -76,6 +80,7 @@ def request_handler(
             request.can_do = perm
             if obj:
                 request = get_request_obj(request, obj)
+                
                 if isinstance(request, JsonResponse):
                     return request
 

@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import namedtuple
 
 from django.http.response import JsonResponse
@@ -7,6 +8,7 @@ from nets_core.params import RequestParam
 from nets_core.responses import permission_denied
 from django.utils.translation import gettext_lazy as _
 
+logger = logging.getLogger(__name__)
 
 def get_value_from_data_key(data, key, params, customer, files):
     # Get value from data calling parse_param
@@ -119,6 +121,9 @@ def request_params_handler(request, params: dict|list={}):
         optional = False
         if isinstance(params[p], RequestParam):
             optional = params[p].optional
+            default = params[p].default if hasattr(params[p], 'default') else None
+            if not p in parsed_data.keys() and optional:
+                parsed_data[p] = default
 
         if p not in parsed_data.keys() and not optional:
             # Omit missing if is instance of RequestParams
@@ -138,6 +143,20 @@ def request_params_handler(request, params: dict|list={}):
 
 
 def get_request_obj(request, obj):
+    """
+        Get object from db using index_field
+        and append to request object
+        
+        if obj has customer field, append customer
+        attribute to request
+
+        if obj has owner or user field, append
+        is_owner and has_owner attributes to request.
+        
+        if not perm(public object or permission granted) and
+        has_owner and not is_owner, return 404 
+
+    """
     index_field = request.index_field
     try:
         o_query = {}
@@ -163,9 +182,14 @@ def get_request_obj(request, obj):
         if hasattr(o, 'owner'):
             request.is_owner = o.owner == request.user
             request.has_owner = True
+
+        if hasattr(o, 'user'):
+            request.is_owner = o.user == request.user
+            request.has_owner = True
             
         if not request.public:
             if not request.perm and (request.has_owner and not request.is_owner):
+                logger.warning(f"User {request.user.id} tried to access {request.obj} {request.obj.id} without permission")
                 return JsonResponse({"res": 0, "message": _("not found")}, status=404)
             
         request.obj = o

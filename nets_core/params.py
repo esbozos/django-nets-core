@@ -42,14 +42,14 @@ def is_date(s: str):
             d = parse(s)
 
         # d = d.date()
-    elif isinstance(s, datetime.datetime):
+    elif isinstance(s, datetime):
         d =  s.date()
-    elif isinstance(s, datetime.date):
+    elif isinstance(s, date):
         d = s
     if d:
         
         # localize date
-        if not isinstance(d, datetime.datetime):
+        if not isinstance(d, datetime):
             try:
                 d = local_datetime(d)
             except Exception as e:
@@ -61,7 +61,7 @@ def is_date(s: str):
             
             d = timezone.make_aware(d)           
 
-        if isinstance(d, datetime.datetime):
+        if isinstance(d, datetime):
             return d.date()
         return d
 
@@ -157,7 +157,15 @@ class RequestParam():
 
         if isinstance(self.type, type) or callable(self.type):
             try:
-                v = self.type(v)
+                if self.type == list and isinstance(v, str):
+                    # Check if value is a list of values
+                    # then convert to list
+                    v = v.replace('[', '').replace(']', '').replace("'", '').replace('"', '')
+                    v = v.split(',')
+                else:
+                    # Check type by type()
+                    v = self.type(v)
+                
             except Exception as e:
                 raise ValueError(
                     f"RP02: {self.errors['invalid_value'].format(self.key)}:  {v} no es {self.type}")
