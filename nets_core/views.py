@@ -14,8 +14,9 @@ from django.utils import timezone
 from django.conf import settings
 from oauth2_provider.models import Application, AccessToken, RefreshToken
 from oauthlib import common
+from django.contrib.auth import get_user_model
 
-User = settings.AUTH_USER_MODEL
+User = get_user_model()
 username_field = getattr(User, "USERNAME_FIELD", "username")
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ def valid_gender(s):
     ],
 )
 def auth_login(request):
+
     try:
         
         defaults = {}
@@ -71,7 +73,7 @@ def auth_login(request):
                 defaults[key] = val
 
         new_user, created = User.objects.get_or_create(
-            **{username_field: request.params.username}, defaults=defaults
+            **{username_field: getattr(request.params, username_field)}, defaults=defaults
         )
 
         if not created:
