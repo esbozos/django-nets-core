@@ -57,6 +57,53 @@ NS_EMAIL_FOOTER_TEMPLATE = None
 NS_EMAIL_EXCLUDE_DOMAINS = []
 NS_VERIFICATION_CODE_CACHE_KEY = 'NC_T'
 
+prohibited_fields = [
+    "password",
+    "is_superuser",
+    "is_staff",
+    "is_active",
+    "verified",
+    "email_verified",
+    "last_login",
+    "date_joined",
+    "updated_fields",
+    "groups",
+    "user_permissions",
+    "doc_*",
+]
+
+.. code-block:: python
+
+    # if you want to use auth.urls
+ path("", include("nets_core.auth_urls", namespace="auth")),
+
+.. set this in your settings.py to exclude fields from user model to be updated by auth.urls
+NETS_CORE_USER_PROHIBITED_FIELDS = prohibited_fields 
+try:
+    if settings.NETS_CORE_USER_PROHIBITED_FIELDS:
+        prohibited_fields += settings.NETS_CORE_USER_PROHIBITED_FIELDS
+except:
+    pass
+
+.. code-block:: python
+    # login url accept device to link verification code to device
+     valid_device_fields = [
+        "name",
+        "os",
+        "os_version",
+        "device_token",
+        "firebase_token",
+        "app_version",
+        "device_id",
+        "device_type",
+    ]
+    valid_device_fields is use to update or create device
+    if uuid is provided, device will be updated, otherwise created
+    if invalid uuid is provided, error will be raised
+
+    # auth url accept device_uuid with email, core, client_id and client_secret to get access token
+
+
 DJANGO SETTINGS
 DEFAULT_FROM_EMAIL is used for emails
 
@@ -65,14 +112,27 @@ CORS REQUEST AND POST require
     CSRF_COOKIE_SAMESITE = 'None'
     CSRF_COOKIE_SECURE = True
 
+
+FIREBASE_CONFIG = os.path.join(BASE_DIR, 'firebase-credentials.json')
 Dependencies
 ____________
+    Django
+    pytz 
+    python-dateutil
+    shortuuid 
+    django-oauth-toolkit 
+    firebase-admin 
+    django-cors-headers
+
 
 Authentication is made with:
     django-oauth-toolkit
     django-cors-headers
 
+
+
     from nets_core.security import authenticate
     authenticate(user, code, client_id, client_secret)
 
 Just to be lazy.
+

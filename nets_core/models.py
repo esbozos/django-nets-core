@@ -1,3 +1,4 @@
+from uuid import uuid4
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 import json
@@ -7,6 +8,9 @@ from django.core.cache import cache
 from nets_core.utils import generate_int_uuid
 from django.contrib.auth.hashers import check_password, make_password
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 token_timeout_seconds = 15*60 # 15 minutes default
 try:
@@ -16,7 +20,7 @@ except Exception as e:
     pass
 
 class OwnedModel(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
 
@@ -25,7 +29,9 @@ class OwnedModel(models.Model):
 
 class VerificationCode(OwnedModel):
     token = models.CharField(_("Verification token"), max_length=150)
+    device = models.ForeignKey("nets_core.UserDevice", max_length=150, null=True, blank=True, on_delete=models.CASCADE)
     verified = models.BooleanField(_("Verified?"), default=False)
+    ip = models.CharField(_("IP"), max_length=150, null=True, blank=True)
 
     class Meta:
         db_table = 'nets_core_verification_code'
@@ -59,9 +65,13 @@ class VerificationCode(OwnedModel):
 
         
 
-    def validate(self, token: str=None):
+    def validate(self, token: str=None, device_uuid: str=None):
         if not token or not self.token:
             return False
+        
+        if self.device:
+            if not device_uuid or self.device.uuid != device_uuid:
+                return False 
 
         if (timezone.now() - self.created).total_seconds() > token_timeout_seconds:
             # code expired delete it.
@@ -118,3 +128,47 @@ class EmailNotification(models.Model):
 
     def __str__(self):
         return "%s %s" % (self.to, self.subject)
+
+
+class UserDevice(OwnedModel):
+    uuid = models.UUIDField(_("UUID"), default=uuid4, editable=False, unique=True)
+    name = models.CharField(_("Name"), max_length=250)
+    os = models.CharField(_("OS"), max_length=250, null=True, blank=True)
+    os_version = models.CharField(_("OS Version"), max_length=250, null=True, blank=True)
+    app_version = models.CharField(_("App Version"), max_length=250, null=True, blank=True)
+    device_type = models.CharField(_("Device Type"), max_length=250, null=True, blank=True)
+    device_token = models.CharField(_("Device Token"), max_length=250, null=True, blank=True)
+    firebase_token = models.CharField(_("Firebase Token"), max_length=250, null=True, blank=True)
+    active = models.BooleanField(_("Active"), default=True)
+    last_login = models.DateTimeField(_("Last login"), null=True)
+    ip = models.CharField(_("IP"), max_length=250, null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("User Device")
+        verbose_name_plural = _("User Devices")
+        db_table = 'nets_core_user_device'
+
+
+    def __str__(self):
+        return self.name
+    
+    def save(self, *args, **kwargs):
+            
+        super(UserDevice, self).save(*args, **kwargs)
+
+class UserFirebaseNotification(OwnedModel):
+    message = models.TextField(_("Message"), null=True, blank=True)
+    devices = models.ManyToManyField(UserDevice, related_name='notifications')
+    data = models.JSONField(_("Data"), null=True, blank=True)
+    sent = models.BooleanField(_("Sent"), default=False)
+    message_id = models.CharField(_("Message ID"), max_length=250, null=True, blank=True)
+    error = models.TextField(_("Error"), null=True, blank=True)
+    device = models.ForeignKey(UserDevice, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = _("User Firebase Notification")
+        verbose_name_plural = _("User Firebase Notifications")
+        db_table = 'nets_core_firebase_notification'
+
+    def __str__(self):
+        return self.message_id

@@ -1,6 +1,6 @@
 import mimetypes
 from datetime import date, datetime
-
+import json
 import pytz
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -143,11 +143,11 @@ class RequestParam():
             v = self.default if self.default else None
             return v
 
-        if isinstance(v, dict) and not self.type == dict:
-            # Check if value was post as dict from select {value: str, label: str}
-
-            if 'value' in v:
-                v = v['value']
+        if isinstance(v, dict):
+            if not self.type == dict:
+                # Check if value was post as dict from select {value: str, label: str}
+                if 'value' in v:
+                    v = v['value']
 
         if v == None and not self.optional and not self.type in ['bool', bool]:
             raise ValueError(f"RP01: {self.errors['required'].format(self.key)}")
@@ -156,17 +156,23 @@ class RequestParam():
             return None
 
         if isinstance(self.type, type) or callable(self.type):
+
             try:
                 if self.type == list and isinstance(v, str):
                     # Check if value is a list of values
                     # then convert to list
                     v = v.replace('[', '').replace(']', '').replace("'", '').replace('"', '')
                     v = v.split(',')
+                elif self.type == dict and isinstance(v, str):
+                    # Check if value is a dict
+                    # then convert to dict
+                    v = json.loads(v)
                 else:
                     # Check type by type()
                     v = self.type(v)
                 
             except Exception as e:
+
                 raise ValueError(
                     f"RP02: {self.errors['invalid_value'].format(self.key)}:  {v} no es {self.type}")
 

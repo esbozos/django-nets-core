@@ -5,6 +5,8 @@ from oauth2_provider.models import Application, AccessToken, RefreshToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
+# TODO: create middleware to restring token_access with device_uuid
+
 def validate_verification_code(user, code: str):
     vcode = VerificationCode.objects.filter(user=user).last()
     if not vcode:
@@ -12,7 +14,7 @@ def validate_verification_code(user, code: str):
     return vcode.validate(code)
 
 
-def authenticate(user, code: str, client_id: str, client_secret: str) -> dict:
+def authenticate(user, code: str, client_id: str, client_secret: str, device_uuid: str=None) -> dict:
     """
         Check client_id and client_secret, validate verification code and
         create access and refresh tokens for oauth2 
@@ -47,10 +49,18 @@ def authenticate(user, code: str, client_id: str, client_secret: str) -> dict:
     if not vcode:
         raise Exception(_("User has not requested verification code"))
     
-    if not vcode.validate(code):
-        raise Exception(_("Invalid code"))
+    if not vcode.validate(code, device_uuid=device_uuid):
+        raise Exception(_("Invalid code for this user and device"))
     
-    if hasattr(user, 'email_verfied'):
+    if vcode.device:
+        vcode.device.last_login = timezone.now()
+        vcode.device.save()
+    
+    # update code as verified
+    vcode.verified = True
+    vcode.save()
+
+    if hasattr(user, 'email_verified'):
         user.email_verified = True
     user.last_login = timezone.now()
     user.save()

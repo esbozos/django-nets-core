@@ -5,7 +5,7 @@ from django.shortcuts import render
 import logging
 from django.utils.translation import gettext_lazy as _
 from nets_core.decorators import request_handler
-from nets_core.models import VerificationCode
+from nets_core.models import UserDevice, VerificationCode
 from nets_core.params import RequestParam
 from nets_core.responses import error_response, success_response
 from nets_core.security import authenticate
@@ -22,24 +22,25 @@ username_field = getattr(User, "USERNAME_FIELD", "username")
 logger = logging.getLogger(__name__)
 
 prohibited_fields = [
-            "password",
-            "is_superuser",
-            "is_staff",
-            "is_active",
-            "verified",
-            "email_verified",
-            "last_login",
-            "date_joined",
-            "updated_fields",
-            "groups",
-            "user_permissions",
-            "doc_*",
-        ]
+    "password",
+    "is_superuser",
+    "is_staff",
+    "is_active",
+    "verified",
+    "email_verified",
+    "last_login",
+    "date_joined",
+    "updated_fields",
+    "groups",
+    "user_permissions",
+    "doc_*",
+]
 try:
     if settings.NETS_CORE_USER_PROHIBITED_FIELDS:
         prohibited_fields += settings.NETS_CORE_USER_PROHIBITED_FIELDS
 except:
     pass
+
 
 def valid_gender(s):
     return s in ["male", "female", "other", "_"]
@@ -49,12 +50,12 @@ def valid_gender(s):
     public=True,
     params=[
         RequestParam(username_field, str),
+        RequestParam("device", dict, True, default= None)
     ],
 )
 def auth_login(request):
-
+    print(request.params)
     try:
-        
         defaults = {}
         for key, val in request.params._asdict().items():
             if hasattr(User, key):
@@ -73,17 +74,72 @@ def auth_login(request):
                 defaults[key] = val
 
         new_user, created = User.objects.get_or_create(
-            **{username_field: getattr(request.params, username_field)}, defaults=defaults
+            **{username_field: getattr(request.params, username_field)},
+            defaults=defaults,
         )
+        
 
-        if not created:
-            # Verification code is created on new_user created
-            # then create new VerificationCode, nets_core listeners
-            # dispatch the email and handle all automatically
+        device = None
 
-            VerificationCode.objects.create(user=new_user)
+        if hasattr(request.params, "device") and request.params.device is not None:
+            valid_device_fields = [
+                "name",
+                "os",
+                "os_version",
+                "device_token",
+                "firebase_token",
+                "app_version",
+                "device_id",
+                "device_type",
+            ]
+            device_data = {}
+            
+            for key, val in request.params.device.items():
+                if key in valid_device_fields:
+                    device_data[key] = val
 
-        return success_response(_("CODE SENT"))
+            if "uuid" in request.params.device and request.params.device["uuid"]:
+                logger.info(f"Device uuid {request.params.device['uuid']} found in auth request")   
+                try:
+                    device = UserDevice.objects.get(
+                        uuid=request.params.device["uuid"], user=new_user
+                    )
+                    
+                    for key, val in device_data.items():
+                        setattr(device, key, val)
+                    device.save()
+
+                    # TODO: Notification to user to new login from device
+
+                except UserDevice.DoesNotExist:
+                    # uuid does not exist or is not associated with user
+                    # delete user if created as invalid request is made
+                    logger.warning(f"Invalid device uuid {request.params.device['uuid']} found in auth request from user request {request.params}")
+                    if created:
+                        new_user.delete()
+
+                    return error_response(_("Invalid device uuid"), 400)
+            else:
+                # new device
+                device_data["user"] = new_user
+                if "firebase_token" in device_data:
+                    device = UserDevice.objects.filter(firebase_token=device_data["firebase_token"], user=new_user)
+                    if device.exists():
+                        device = device.first()
+                        for key, val in device_data.items():
+                            setattr(device, key, val)
+                        device.save()
+                    else:
+                        device = UserDevice.objects.create(**device_data)
+                else:
+                    device = UserDevice.objects.create(**device_data)
+
+
+        # create verification code, listeners will send email/sms and devices notifications
+        # with firebase
+        VerificationCode.objects.create(user=new_user, ip=request.ip, device=device)
+
+        return success_response(_("CODE SENT"), extra={"device_uuid": device.uuid if device else None})
 
     except IntegrityError as e:
         print(e)
@@ -115,12 +171,23 @@ def check_email(request):
 )
 def auth(request):
     user = request.obj
+    device_uuid = None
+    if hasattr(request.params, 'device_uuid'):
+        try:
+            device = UserDevice.objects.get(uuid=request.params.device_uuid, user=user)
+            device_uuid = device.uuid
+        except UserDevice.DoesNotExist:
+            return error_response(_("Invalid device uuid"), 400)
+        
+        
+
     try:
         tokens = authenticate(
             user=user,
             code=request.params.code,
             client_id=request.params.client_id,
             client_secret=request.params.client_secret,
+            device_uuid=device_uuid,
         )
         if not user.email_verified:
             user.email_verified = True
@@ -152,7 +219,7 @@ def update_user(request):
     user = request.user
     updated_fields = {}
 
-    if hasattr(user, 'updated_fields'):
+    if hasattr(user, "updated_fields"):
         updated_fields = user.updated_fields
 
     for key, val in request.params._asdict().items():
@@ -162,14 +229,14 @@ def update_user(request):
                     # exact match e.g. password
                     logger.info(f"Prohibited field {key} found in auth request")
                     continue
-                    
+
                 if field.endswith("*"):
                     # check if key starts with field
                     # e.g. doc_id, doc_id_type, doc_id_country
                     if key.startswith(field[:-1]):
                         # logger.info(f"Prohibited field {key} found in auth request")
                         continue
-                
+
                 if key not in updated_fields:
                     updated_fields[key] = []
                 updated_fields[key].append(
@@ -181,8 +248,6 @@ def update_user(request):
                 )
                 setattr(user, key, val)
 
-    
-
     if request.FILES:
         for field in request.FILES:
             if not hasattr(user, field):
@@ -193,7 +258,7 @@ def update_user(request):
                     # exact match e.g. password
                     logger.info(f"Prohibited field {key} found in auth request")
                     continue
-                    
+
                 if field.endswith("*"):
                     # check if key starts with field
                     # e.g. doc_id, doc_id_type, doc_id_country
@@ -212,7 +277,6 @@ def update_user(request):
                 )
 
                 setattr(user, field, request.FILES[field])
-        
 
     user.updated_fields = updated_fields
     try:
