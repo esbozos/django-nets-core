@@ -19,5 +19,4 @@ from django.urls import include, path
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("", include("nets_core.auth_urls", namespace="auth")),
-
 ]

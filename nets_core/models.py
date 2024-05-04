@@ -21,7 +21,6 @@ except Exception as e:
 
 class OwnedModel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
 
@@ -33,7 +32,6 @@ class VerificationCode(OwnedModel):
     device = models.ForeignKey("nets_core.UserDevice", max_length=150, null=True, blank=True, on_delete=models.CASCADE)
     verified = models.BooleanField(_("Verified?"), default=False)
     ip = models.CharField(_("IP"), max_length=150, null=True, blank=True)
-    verified = models.BooleanField(_("Verified?"), default=False)
 
     class Meta:
         db_table = 'nets_core_verification_code'
@@ -95,9 +93,6 @@ class VerificationCode(OwnedModel):
         if self.device:
             if not device_uuid or self.device.uuid != device_uuid:
                 return False 
-    def validate(self, token: str=None):
-        if not token or not self.token:
-            return False
 
         if (timezone.now() - self.created).total_seconds() > token_timeout_seconds:
             # code expired delete it.

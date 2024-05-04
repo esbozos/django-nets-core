@@ -80,7 +80,7 @@ def request_handler(
             request.can_do = perm
             if obj:
                 request = get_request_obj(request, obj)
-
+                
                 if isinstance(request, JsonResponse):
                     return request
 

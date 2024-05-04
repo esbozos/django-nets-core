@@ -17,12 +17,12 @@ if hasattr(settings, 'FIREBASE_CONFIG'):
 if not firebase_config:
     logger.warning('FIREBASE_CONFIG not set')
     # raise ValueError('FIREBASE_CONFIG not set')
-
-try:
-    cred = credentials.Certificate(firebase_config)
-    default_app = firebase_admin.initialize_app(cred)
-except Exception as e:
-    logger.error('Error initializing firebase', e)
+else:
+    try:
+        cred = credentials.Certificate(firebase_config)
+        default_app = firebase_admin.initialize_app(cred)
+    except Exception as e:
+        logger.error('Error initializing firebase', e)
     # raise ValueError('Error initializing firebase', e)
 
 

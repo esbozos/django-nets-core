@@ -327,7 +327,7 @@ def request_delete_user_account(request):
 
 
 @request_handler(
-    params=[RequestParam("sure", bool, default=False), RequestParam("code", str)]
+    params=[RequestParam("sure", bool, default=False), RequestParam("code", str)],
 )
 def delete_user_account(request):
     if not request.params.sure:

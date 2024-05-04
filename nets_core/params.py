@@ -1,7 +1,6 @@
 import mimetypes
 from datetime import date, datetime
 import json
-
 import pytz
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -174,9 +173,6 @@ class RequestParam():
                 
             except Exception as e:
 
-            try:
-                v = self.type(v)
-            except Exception as e:
                 raise ValueError(
                     f"RP02: {self.errors['invalid_value'].format(self.key)}:  {v} no es {self.type}")
 
