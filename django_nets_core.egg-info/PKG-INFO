@@ -1,11 +1,12 @@
 Metadata-Version: 2.1
 Name: django-nets-core
-Version: 0.1.59
+Version: 0.1.60
 Summary: A lazy API rest request handler.
 Home-page: https://github.com/esbozos/django-nets-core
 Author: Norman Torres
 Author-email: norman.nets@gmail.com
 License: BSD-3-Clause  # Example license
+Platform: UNKNOWN
 Classifier: Environment :: Web Environment
 Classifier: Framework :: Django
 Classifier: Framework :: Django :: 5.0
@@ -24,12 +25,6 @@ Classifier: Topic :: Internet :: WWW/HTTP
 Classifier: Topic :: Internet :: WWW/HTTP :: Dynamic Content
 Requires-Python: >=3.8
 License-File: LICENSE
-Requires-Dist: Django>=5.0.4
-Requires-Dist: pytz>=2024.1
-Requires-Dist: python-dateutil>=2.9.0.post0
-Requires-Dist: shortuuid>=1.0.13
-Requires-Dist: django-oauth-toolkit>=2.3.0
-Requires-Dist: firebase-admin>=6.5.0
 
 =========
 NETS CORE
@@ -188,3 +183,5 @@ Authentication is made with:
 Just to be lazy.
 
 =======
+
+
