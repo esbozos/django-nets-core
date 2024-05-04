@@ -190,6 +190,9 @@ def get_request_obj(request, obj):
         if not request.public:
             if not request.perm and (request.has_owner and not request.is_owner):
                 logger.warning(f"User {request.user.id} tried to access {request.obj} {request.obj.id} without permission")
+            
+        if not request.public:
+            if not request.perm and (request.has_owner and not request.is_owner):
                 return JsonResponse({"res": 0, "message": _("not found")}, status=404)
             
         request.obj = o

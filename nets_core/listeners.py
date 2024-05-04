@@ -16,14 +16,14 @@ def send_verification_code_email(sender, instance, created, **kwargs):
     if created:
         # send email
         cache_token_key = instance.get_token_cache_key()
-        button_link = {"url": "", "label": cache.get(cache_token_key)}
-        template = None
+        button_link = {
+            "url": "",
+            "label": cache.get(cache_token_key)
+        }
+        template = None 
         html = None
-        email_template = (
-            EmailTemplate.objects.filter(use_for="verification_code", enabled=True)
-            .order_by("-created")
-            .first()
-        )
+        email_template = EmailTemplate.objects.filter(
+            use_for='verification_code', enabled=True).order_by('-created').first()
 
         if email_template:
             html = email_template.html_body
@@ -64,3 +64,9 @@ def send_verification_code_email(sender, instance, created, **kwargs):
             send_user_device_notification(
                 instance.user, title=title, message=message, data=data
             )
+            template = 'nets_core/email/verification_code.html'
+        
+        result = send_email(_("Verification code"), [instance.user.email], template, {
+            "button_link": button_link, "user": instance.user
+        }, html=html, to_queued=False)
+        print(result)
