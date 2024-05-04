@@ -1,0 +1,47 @@
+<!-- BASE TEMPLATE FOR REQUEST USER ACCOUNT DELETION -->
+{% extends "nets_core/base.html" %}
+{% load static i18n %}
+{% block content %}
+{% include info_template %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            {% blocktrans %}
+                <h1>Request Account Deletion</h1>
+                <p>Are you sure you want to delete your account?</p>
+                <p>This action cannot be undone.</p>
+            {% endblocktrans %}
+            <form method="POST" onsubmit="sendCode(event)">
+                {% csrf_token %}
+                <input type="email" name="email" class="form-control" placeholder="Enter your email address" required >
+                <input type="submit" class="btn btn-primary" value="Send Code" >
+            </form>
+            <form method="POST" >
+                {% csrf_token %}
+                <br>
+                <input type="code" name="code" class="form-control" placeholder="Enter the code sent to your email address" required>
+                <input type="submit" class="btn btn-danger" value="Delete Account">
+                <a href="{% url 'auth:delete' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function sendCode(e) {
+        e.preventDefault();
+        var email = document.getElementsByName("email")[0].value;
+        var csrftoken = document.getElementsByName("csrfmiddlewaretoken")[0].value;
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "{% url 'auth:login' %}", true);
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        xhr.onreadystatechange = function() {
+            if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
+                alert("Code sent to " + email);
+            }
+        }
+        xhr.send("email=" + email);
+    }
+</script>
+{% endblock %}
+

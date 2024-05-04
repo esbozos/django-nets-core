@@ -1,0 +1,33 @@
+{% extends 'nets_core/email/base_email.html' %}
+{% load i18n %}
+
+{% block title %}
+    {% trans 'New access to your account' %}
+{% endblock title %}
+
+{% block content %}
+    <h5>{% trans 'A new device has access to your account' %}</h5>
+    <table style="width: 600px;">
+        <tbody>
+            <tr>
+                <thead>{% trans 'Device Name' %}</thead>
+                <tbody>{{ device.name }}</tbody>
+            </tr>
+            <tr>
+                <thead>{% trans 'Ip address' %}</thead>
+                <tbody>{{ device.ip }}</tbody>
+            </tr>
+            <tr>
+                <thead>{% trans 'Device OS' %}</thead>
+                <tbody>{{ device.os }}</tbody>
+            </tr>
+            <tr>
+                <thead>{% trans 'Date time' %}</thead>
+                <tbody>{{ device.last_login }}</tbody>
+            </tr>
+        </tbody>
+    </table>
+    <p>
+        {% trans 'if you don't recognize this device remove it inspect who have access to your email account. ' %}
+    </p>
+{% endblock content %}

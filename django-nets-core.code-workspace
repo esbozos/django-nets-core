@@ -1,0 +1,14 @@
+{
+    "folders": [
+        {
+            "path": "."
+        },
+        {
+            "path": "../nets_core"
+        }
+    ],
+    "settings": {
+        "workbench.colorTheme": "Red",
+        "esbonio.sphinx.confDir": ""
+    }
+}
