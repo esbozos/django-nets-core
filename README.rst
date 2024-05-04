@@ -57,6 +57,7 @@ settings VARS:
 
 Cache is required for verification code:
 check https://docs.djangoproject.com/en/4.1/topics/cache/ and pick your preference cache engine.
+.. code-block:: python
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.memcached.PyMemcacheCache',
@@ -64,6 +65,7 @@ CACHES = {
     }
 }
 
+.. code-block:: python
 NS_VERIFICATION_CODE_EXPIRE_SECONDS = 15*60 # 900 seconds
 NS_EMAIL_FOOTER_ENABLED = True 
 NS_EMAIL_FOOTER = ''
@@ -72,6 +74,7 @@ NS_EMAIL_FOOTER_TEMPLATE = None
 NS_EMAIL_EXCLUDE_DOMAINS = []
 NS_VERIFICATION_CODE_CACHE_KEY = 'NC_T'
 
+.. code-block:: python
 prohibited_fields = [
     "password",
     "is_superuser",
@@ -88,10 +91,10 @@ prohibited_fields = [
 ]
 
 .. code-block:: python
-
     # if you want to use auth.urls
  path("", include("nets_core.auth_urls", namespace="auth")),
 
+.. code-block:: python
 .. set this in your settings.py to exclude fields from user model to be updated by auth.urls
 NETS_CORE_USER_PROHIBITED_FIELDS = prohibited_fields 
 try:
@@ -121,15 +124,16 @@ except:
 
 =======
 DJANGO SETTINGS
+.. code-block:: python
 DEFAULT_FROM_EMAIL is used for emails
 
 CORS REQUEST AND POST require
+CSRF_COOKIE_SAMESITE = 'None'
+CSRF_COOKIE_SECURE = True
 
-    CSRF_COOKIE_SAMESITE = 'None'
-    CSRF_COOKIE_SECURE = True
-
-
+.. code-block:: python
 FIREBASE_CONFIG = os.path.join(BASE_DIR, 'firebase-credentials.json')
+
 Dependencies
 ____________
     Django
@@ -141,17 +145,16 @@ ____________
     django-cors-headers
 
 
-=======
-Authentication is made with:
+
+## Authentication is made with:
     django-oauth-toolkit
     django-cors-headers
 
 
 
-=======
+## Authentication
+
     from nets_core.security import authenticate
     authenticate(user, code, client_id, client_secret)
 
 Just to be lazy.
-
-=======
