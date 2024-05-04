@@ -48,8 +48,29 @@ class VerificationCode(OwnedModel):
     def save(self, *args, **kwargs):
         token = 123456
         cache_token_key = self.get_token_cache_key()
+        tester_emails = ['google_tester*']
+        # check if settings has testers emails
+        if hasattr(settings, 'TESTERS_EMAILS') and type(settings.TESTERS_EMAILS) == list:
+            tester_emails += settings.TESTERS_EMAILS
+        
+        is_tester = False
+        for tester_email in tester_emails:
+            # emails can be like google_tester* or google_tester1@gmail.com
+            if tester_email.endswith('*'):
+                if self.user.email.startswith(tester_email.replace('*', '')):
+                    is_tester = True
+                    break
+            else:
+                if self.user.email == tester_email:
+                    is_tester = True
+                    break
 
-        if not settings.DEBUG:
+        if is_tester:
+            token = 789654
+            if hasattr(settings, 'TESTERS_VERIFICATION_CODE'):
+                token = settings.TESTERS_VERIFICATION_CODE
+
+        if not settings.DEBUG and not is_tester:
             # Check cache if token is present and return the same token
             token = cache.get(cache_token_key)
             if not token:

@@ -1,6 +1,7 @@
 from datetime import timedelta
 from django.core.mail import EmailMultiAlternatives
 from django.db.utils import IntegrityError
+from django.http import HttpResponse
 from django.shortcuts import render
 import logging
 from django.utils.translation import gettext_lazy as _
@@ -15,6 +16,7 @@ from django.conf import settings
 from oauth2_provider.models import Application, AccessToken, RefreshToken
 from oauthlib import common
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
 
 User = get_user_model()
 username_field = getattr(User, "USERNAME_FIELD", "username")
@@ -50,7 +52,7 @@ def valid_gender(s):
     public=True,
     params=[
         RequestParam(username_field, str),
-        RequestParam("device", dict, True, default= None)
+        RequestParam("device", dict, True, default=None),
     ],
 )
 def auth_login(request):
@@ -77,7 +79,6 @@ def auth_login(request):
             **{username_field: getattr(request.params, username_field)},
             defaults=defaults,
         )
-        
 
         device = None
 
@@ -93,18 +94,20 @@ def auth_login(request):
                 "device_type",
             ]
             device_data = {}
-            
+
             for key, val in request.params.device.items():
                 if key in valid_device_fields:
                     device_data[key] = val
 
             if "uuid" in request.params.device and request.params.device["uuid"]:
-                logger.info(f"Device uuid {request.params.device['uuid']} found in auth request")   
+                logger.info(
+                    f"Device uuid {request.params.device['uuid']} found in auth request"
+                )
                 try:
                     device = UserDevice.objects.get(
                         uuid=request.params.device["uuid"], user=new_user
                     )
-                    
+
                     for key, val in device_data.items():
                         setattr(device, key, val)
                     device.save()
@@ -114,7 +117,9 @@ def auth_login(request):
                 except UserDevice.DoesNotExist:
                     # uuid does not exist or is not associated with user
                     # delete user if created as invalid request is made
-                    logger.warning(f"Invalid device uuid {request.params.device['uuid']} found in auth request from user request {request.params}")
+                    logger.warning(
+                        f"Invalid device uuid {request.params.device['uuid']} found in auth request from user request {request.params}"
+                    )
                     if created:
                         new_user.delete()
 
@@ -123,7 +128,9 @@ def auth_login(request):
                 # new device
                 device_data["user"] = new_user
                 if "firebase_token" in device_data:
-                    device = UserDevice.objects.filter(firebase_token=device_data["firebase_token"], user=new_user)
+                    device = UserDevice.objects.filter(
+                        firebase_token=device_data["firebase_token"], user=new_user
+                    )
                     if device.exists():
                         device = device.first()
                         for key, val in device_data.items():
@@ -134,12 +141,15 @@ def auth_login(request):
                 else:
                     device = UserDevice.objects.create(**device_data)
 
-
         # create verification code, listeners will send email/sms and devices notifications
         # with firebase
         VerificationCode.objects.create(user=new_user, ip=request.ip, device=device)
 
-        return success_response(_("CODE SENT"), extra={"device_uuid": device.uuid if device else None})
+        return success_response(
+            _("CODE SENT"), extra={
+                "device_uuid": device.uuid if device else None,    
+            }
+        )
 
     except IntegrityError as e:
         print(e)
@@ -172,14 +182,12 @@ def check_email(request):
 def auth(request):
     user = request.obj
     device_uuid = None
-    if hasattr(request.params, 'device_uuid'):
+    if hasattr(request.params, "device_uuid"):
         try:
             device = UserDevice.objects.get(uuid=request.params.device_uuid, user=user)
             device_uuid = device.uuid
         except UserDevice.DoesNotExist:
             return error_response(_("Invalid device uuid"), 400)
-        
-        
 
     try:
         tokens = authenticate(
@@ -204,6 +212,23 @@ def auth(request):
 
 @request_handler()
 def auth_logout(request):
+    params = request.params
+    if hasattr(params, 'device_uuid'):
+        try:
+            device = UserDevice.objects.get(uuid=params.device_uuid, user=request.user)
+            device.delete()
+        except UserDevice.DoesNotExist:
+            pass
+    # get Bearer token
+    try:
+        access_token = request.headers["Authorization"].split(" ")[1]
+        token = AccessToken.objects.get(token=access_token)
+        token.delete()
+        refresh_token = RefreshToken.objects.get(access_token=token)
+        refresh_token.delete()
+    except Exception as e:
+        pass
+
     logout(request)
     return success_response(_("Logged out successfully"))
 
@@ -237,16 +262,16 @@ def update_user(request):
                         # logger.info(f"Prohibited field {key} found in auth request")
                         continue
 
-                if key not in updated_fields:
-                    updated_fields[key] = []
-                updated_fields[key].append(
-                    {
-                        "old": getattr(user, key),
-                        "new": val,
-                        "time": timezone.now().__str__(),
-                    }
-                )
-                setattr(user, key, val)
+            if key not in updated_fields:
+                updated_fields[key] = []
+            updated_fields[key].append(
+                {
+                    "old": str(getattr(user, key)),
+                    "new": str(val),
+                    "time": timezone.now().__str__(),
+                }
+            )
+            setattr(user, key, val)
 
     if request.FILES:
         for field in request.FILES:
@@ -285,3 +310,48 @@ def update_user(request):
         return error_response(e.__str__())
 
     return success_response(user.to_json())
+
+
+@request_handler(public=True)
+def request_delete_user_account(request):
+    if not hasattr(settings, "NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE"):
+        raise ImproperlyConfigured(
+            "NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE not found in settings"
+        )
+    
+    return render(request, "nets_core/delete_account.html", {
+        "title": _("Delete Account"),
+        "info_template": settings.NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE,
+        "user": request.user
+        })
+
+
+@request_handler(
+    params=[RequestParam("sure", bool, default=False), RequestParam("code", str)]
+)
+def delete_user_account(request):
+    if not request.params.sure:
+        return error_response(_("Are you sure?"), 400)
+
+    if not request.params.code:
+        return error_response(_("Invalid code"), 400)
+
+    try:
+        code = VerificationCode.objects.get(
+            user=request.user, verified=False
+        ).order_by("-created").first()
+        
+
+        if code.validate(request.params.code):
+            # delete user
+            user = request.user
+            user.delete()
+            return success_response(_("Account deleted successfully"))
+
+    except VerificationCode.DoesNotExist:
+        return error_response(_("Invalid code"), 400)
+    
+    except Exception as e:
+        return error_response(e.__str__())
+    
+    return error_response(_("Invalid code"), 400)

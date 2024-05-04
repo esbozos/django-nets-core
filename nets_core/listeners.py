@@ -50,15 +50,15 @@ def send_verification_code_email(sender, instance, created, **kwargs):
                 _("New login"),
                 [instance.user.email],
                 template,
-                {"user": instance.user, "ip": instance.ip, "device": instance.device},
+                {"user": instance.user, "ip": str(instance.ip), "device": instance.device},
                 to_queued=False,
             )
 
             message = _("New login to your account from ip address") + " " + instance.ip
-            data = {"type": "login", "ip": instance.ip, "device": ""}
+            data = {"type": "login", "ip": str(instance.ip), "device": ""}
             if instance.device:
                 message += " " + _("using device") + " " + instance.device.__str__()
-                data["device"] = instance.device.name
+                data["device"] = f"{instance.device.name}"
                 data["device_id"] = f"{instance.device_id}"
             title = f"{_('New login')} {instance.user.username}"
             send_user_device_notification(
