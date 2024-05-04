@@ -22,7 +22,6 @@ except Exception as e:
 class OwnedModel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
->>>>>>> 557f77fde5694bd5b79946c60df5b3dc916b8512
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
 
@@ -74,8 +73,6 @@ class VerificationCode(OwnedModel):
                 token = settings.TESTERS_VERIFICATION_CODE
 
         if not settings.DEBUG and not is_tester:
-
-        if not settings.DEBUG:
             # Check cache if token is present and return the same token
             token = cache.get(cache_token_key)
             if not token:
