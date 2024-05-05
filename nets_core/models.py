@@ -24,7 +24,7 @@ User = get_user_model()
 if hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
     try:
         app_label, model_name = settings.NETS_CORE_PROJECT_MODEL.split('.')
-        project_model = apps.get_model(app_label, model_name)
+        project_model = apps.get_model(app_label, model_name, require_ready=False)
     except Exception as e:
         raise Exception('NETS_CORE_PROJECT_MODEL not set correctly in settings')
 else:

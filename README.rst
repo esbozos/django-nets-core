@@ -203,7 +203,7 @@ Set verification code expire time
     NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS = 15*60 # 900 seconds
 
 Set email footer
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
@@ -227,7 +227,7 @@ Enable sent emails while settings.DEBUG is True, default to False. Enable if you
 
 
 Set excluded domains
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 Sometimes you want to exclude some domains from sent emails to avoid spamming, like temporary emails or testing domains
 like service providers as mailinator.com, temp-mail.org, guerillamail.com, emailondeck.com, ironmail.com, cloakmail.com, 10minutemail.com, 33mail.com, maildrop.cc, etc.
@@ -248,11 +248,12 @@ Set cache key to store verification code, default is 'NC_T'
     NETS_CORE_VERIFICATION_CODE_CACHE_KEY = 'NC_T'
 
 Set prohibited fields
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 
 nets_core.auth_urls provide endpoints to update user model fields, you can exclude some fields from being updated by auth.urls
 
 Set fields that should not be updated by auth.urls
+
 .. code-block:: python
 
     prohibited_fields = [
@@ -300,8 +301,9 @@ you need to set the following settings
     NETS_CORE_TESTERS_EMAILS = ['google_testers234*', 'tester1@myappdomain.com']
     NETS_CORE_TESTERS_VERIFICATION_CODE = '475638'
 
+
 NETS_CORE_TESTERS_EMAILS is a list of emails that will be allowed to authenticate without receiving email verification code
-this could end with * to allow all emails that start with the string before the *, for production use a strong string and different for each project 
+this could end with \* to allow all emails that start with the string before the \*, for production use a strong string and different for each project 
 and environment, to avoid unauthorized access
 
 NETS_CORE_TESTERS_VERIFICATION_CODE is the verification code that will be used to authenticate testers
