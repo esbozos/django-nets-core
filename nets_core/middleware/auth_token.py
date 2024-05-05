@@ -41,7 +41,7 @@ def get_user(scope):
 
 class AuthTokenMiddleware(BaseMiddleware):
     """
-    Token authorization middleware for Django Channels 3
+    Token authorization middleware for Django Channels 
     And OAUTH2 PROVIDER
     """
 
@@ -60,7 +60,8 @@ class AuthTokenMiddleware(BaseMiddleware):
         # Grab the finalized/resolved scope
         await self.resolve_scope(scope)
 
-        return await super().__call__(scope, receive, send)
+        return await self.app(scope, receive, send)
+        # return await super().__call__(scope, receive, send)
 
 
 def AuthTokenMiddlewareStack(inner): return (
