@@ -12,26 +12,26 @@ from django.core.mail.backends.smtp import EmailBackend
 
 exclude_domains = []
 try:
-    exclude_domains = settings.NS_EMAIL_EXCLUDE_DOMAINS
+    exclude_domains = settings.NETS_CORE_EMAIL_EXCLUDE_DOMAINS
 except:
     pass
 
 footer_enabled = True
 try:
-    footer_enabled = settings.NS_EMAIL_FOOTER_ENABLED
+    footer_enabled = settings.NETS_CORE_EMAIL_FOOTER_ENABLED
 except:
     pass
 
 footer = "<span><i class=\"small\">{}</i></span>".format(
-        _("NETS CORE footer email, you can customize this message in settings.NS_EMAIL_FOOTER"))
+        _("NETS CORE footer email, you can customize this message in settings.NETS_CORE_EMAIL_FOOTER"))
 try:
-    footer = f"<span><i class=\"small\">{settings.NS_EMAIL_FOOTER}</i></span>"
+    footer = f"<span><i class=\"small\">{settings.NETS_CORE_EMAIL_FOOTER}</i></span>"
 except:
     pass
 
 footer_template = None
 try:
-    footer_template = settings.NS_EMAIL_FOOTER_TEMPLATE
+    footer_template = settings.NETS_CORE_EMAIL_FOOTER_TEMPLATE
 except:
     pass
 
@@ -43,7 +43,7 @@ except:
 
 mail_debug_enabled = False
 try:
-    mail_debug_enabled = settings.NS_EMAIL_DEBUG_ENABLED
+    mail_debug_enabled = settings.NETS_CORE_EMAIL_DEBUG_ENABLED
 except:
     pass
 
@@ -62,14 +62,14 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
     if(isinstance(email, str)):
         email_domain = email.split('@')
         if email_domain in exclude_domains:
-            return (False, f'{_("Email domain is in NS_MAIL_EXCLUDE_DOMAINS ")} {email_domain}')
+            return (False, f'{_("Email domain is in NETS_CORE_EMAIL_EXCLUDE_DOMAINS ")} {email_domain}')
 
     elif isinstance(email, list):
         for e in email:
             email_domain = e.split('@')
             if email_domain in exclude_domains:
                 email.pop(email.index(e))
-                print(f"{_('Email domain is in NS_MAIL_EXCLUDE_DOMAINS')} {email_domain}")
+                print(f"{_('Email domain is in NETS_CORE_EMAIL_EXCLUDE_DOMAINS')} {email_domain}")
     
     if not email:
         return (False, _("email is empty"))

@@ -146,9 +146,10 @@ def auth_login(request):
         VerificationCode.objects.create(user=new_user, ip=request.ip, device=device)
 
         return success_response(
-            _("CODE SENT"), extra={
-                "device_uuid": device.uuid if device else None,    
-            }
+            _("CODE SENT"),
+            extra={
+                "device_uuid": device.uuid if device else None,
+            },
         )
 
     except IntegrityError as e:
@@ -213,7 +214,7 @@ def auth(request):
 @request_handler()
 def auth_logout(request):
     params = request.params
-    if hasattr(params, 'device_uuid'):
+    if hasattr(params, "device_uuid"):
         try:
             device = UserDevice.objects.get(uuid=params.device_uuid, user=request.user)
             device.delete()
@@ -314,16 +315,20 @@ def update_user(request):
 
 @request_handler(public=True)
 def request_delete_user_account(request):
-    if not hasattr(settings, "NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE"):
-        raise ImproperlyConfigured(
-            "NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE not found in settings"
-        )
-    
-    return render(request, "nets_core/delete_account.html", {
-        "title": _("Delete Account"),
-        "info_template": settings.NETS_CORE_DELETE_ACCOUNT_EMAIL_TEMPLATE,
-        "user": request.user
-        })
+    if not hasattr(settings, "NETS_CORE_DELETE_ACCOUNT_TEMPLATE"):
+        info_template = "nets_core/delete_account_info.html"
+    else:
+        info_template = settings.NETS_CORE_DELETE_ACCOUNT_TEMPLATE
+
+    return render(
+        request,
+        "nets_core/delete_account.html",
+        {
+            "title": _("Delete Account"),
+            "info_template": info_template,
+            "user": request.user,
+        },
+    )
 
 
 @request_handler(
@@ -337,10 +342,11 @@ def delete_user_account(request):
         return error_response(_("Invalid code"), 400)
 
     try:
-        code = VerificationCode.objects.get(
-            user=request.user, verified=False
-        ).order_by("-created").first()
-        
+        code = (
+            VerificationCode.objects.get(user=request.user, verified=False)
+            .order_by("-created")
+            .first()
+        )
 
         if code.validate(request.params.code):
             # delete user
@@ -350,8 +356,8 @@ def delete_user_account(request):
 
     except VerificationCode.DoesNotExist:
         return error_response(_("Invalid code"), 400)
-    
+
     except Exception as e:
         return error_response(e.__str__())
-    
+
     return error_response(_("Invalid code"), 400)

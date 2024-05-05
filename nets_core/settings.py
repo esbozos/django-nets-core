@@ -127,8 +127,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 try:
     from .settings_nets import *
-    print(f"Installe apps: {INSTALLED_APPS}")
-    print(f"ASGI: {ASGI_APPLICATION}")
+
 except ImportError:
     print('No settings_nets.py file found')
     pass

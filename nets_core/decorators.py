@@ -1,14 +1,17 @@
 from functools import wraps
 import logging
 
+from django.apps import apps
 from django.http.response import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 from nets_core.handlers import get_request_obj, request_params_handler
 from nets_core.params import RequestParam
 from nets_core.responses import permission_denied
 from nets_core.utils import get_client_ip
-from django.utils.translation import gettext_lazy as _
+
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +24,7 @@ def request_handler(
     optionals: dict={}, 
     allow_anonymous=False, 
     public=False,
-    customer_required=False,
+    project_required=False,
     index_field: str = 'id'):
     """
         Decorator for request params handler
@@ -58,7 +61,34 @@ def request_handler(
                     _params_dict[p.key] = p
                 _params = _params_dict
                 
-            request.customer_required = customer_required
+            if project_required:
+                if not hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
+                    raise Exception('NETS_CORE_PROJECT_MODEL not set in settings')
+                else:
+                    if not hasattr(request, 'project_id'):
+                        return JsonResponse({"res": 0, "message": _('project_id required')}, status=400)
+                    
+                    project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
+                    try:
+                        project = project_model.objects.get(id=request.project_id)
+                        request.project = project
+                    except project_model.DoesNotExist:
+                        return JsonResponse({"res": 0, "message": _('project not found')}, status=404)
+                    
+                if not hasattr(settings, 'NETS_CORE_PROJECT_MEMBER_MODEL'):
+                    raise Exception('NETS_CORE_PROJECT_MEMBER_MODEL not set in settings')
+                else:
+                    project_member_model = apps.get_model(settings.NETS_CORE_PROJECT_MEMBER_MODEL)
+                    try:
+                        project_member = project_member_model.objects.get(user=request.user, project=project)
+                        request.project_membership = project_member
+                    except project_member_model.DoesNotExist:
+                        if perm_required:
+                            return JsonResponse({"res": 0, "message": _('project member not found')}, status=404)
+                        
+            
+                
+            request.project_required = project_required
             request.public = public
             request.index_field = index_field
             request = request_params_handler(request, _params)

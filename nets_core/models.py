@@ -1,20 +1,38 @@
+import json
+import shortuuid
+
 from uuid import uuid4
+
+
+from django.conf import settings
+from django.apps import apps
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-import json
-from django.conf import settings
-import shortuuid
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.cache import cache
-from nets_core.utils import generate_int_uuid
 from django.contrib.auth.hashers import check_password, make_password
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
+
+from nets_core.utils import generate_int_uuid
+
+
 User = get_user_model()
+
+if hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
+    try:
+        app_label, model_name = settings.NETS_CORE_PROJECT_MODEL.split('.')
+        project_model = apps.get_model(app_label, model_name)
+    except Exception as e:
+        raise Exception('NETS_CORE_PROJECT_MODEL not set correctly in settings')
+else:
+    project_model = None    
 
 token_timeout_seconds = 15*60 # 15 minutes default
 try:
-    token_timeout_seconds = settings.NS_VERIFICATION_CODE_EXPIRE_SECONDS
+    token_timeout_seconds = settings.NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS
 except Exception as e:
     # Settings not present use default
     pass
@@ -26,6 +44,79 @@ class OwnedModel(models.Model):
 
     class Meta:
         abstract = True
+
+class Permission(models.Model):
+    name = models.CharField(_("Name"), max_length=150)
+    codename = models.CharField(_("Codename"), max_length=150)
+    description = models.CharField(_("Description"), max_length=250, null=True, blank=True)
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True, related_name='nets_core_permissions')
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
+
+    class Meta:
+        verbose_name = _("Permission")
+        verbose_name_plural = _("Permissions")
+        db_table = 'nets_core_permission'
+        indexes = [
+            models.Index(fields=['project_content_type', 'project_id'], name='permission_index')
+        ]
+
+    def __str__(self):
+        if self.project:
+            return f'{self.name} - {self.codename} - {self.project}'
+        return f'{self.name} - {self.codename}'
+    
+    def save(self, *args, **kwargs):
+        self.codename = self.codename.lower()
+        if not self.name:
+            self.name = self.codename
+            
+        super(Permission, self).save(*args, **kwargs)
+        
+class Role(models.Model):
+    name = models.CharField(_("Name"), max_length=150)
+    codename = models.CharField(_("Codename"), max_length=150)
+    description = models.CharField(_("Description"), max_length=250)
+    permissions = models.ManyToManyField(Permission, related_name='roles')
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
+
+    class Meta:
+        verbose_name = _("Role")
+        verbose_name_plural = _("Roles")
+        db_table = 'nets_core_role'
+        indexes = [
+            models.Index(fields=['project_content_type', 'project_id'], name='role_index')
+        ]
+
+    def __str__(self):
+        if self.project:
+            return f'{self.name} - {self.project}'
+        return self.name
+        
+    def save(self, *args, **kwargs):
+        self.codename = self.codename.lower()
+        super(Role, self).save(*args, **kwargs)
+        
+class UserRole(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
+
+    class Meta:
+        verbose_name = _("User Role")
+        verbose_name_plural = _("User Roles")
+        db_table = 'nets_core_user_role'
+
+    def __str__(self):
+        if self.project:
+            return f'{self.user} - {self.role} - {self.project}'
+        return f'{self.user} - {self.role}'    
+    
+
 
 class VerificationCode(OwnedModel):
     token = models.CharField(_("Verification token"), max_length=150)
@@ -39,7 +130,7 @@ class VerificationCode(OwnedModel):
     def get_token_cache_key(self):
         token_key_prefix = 'NC_T'
         try:
-            token_key_prefix = settings.NS_VERIFICATION_CODE_CACHE_KEY 
+            token_key_prefix = settings.NETS_CORE_VERIFICATION_CODE_CACHE_KEY 
         except:
             pass
 
@@ -50,8 +141,8 @@ class VerificationCode(OwnedModel):
         cache_token_key = self.get_token_cache_key()
         tester_emails = ['google_tester*']
         # check if settings has testers emails
-        if hasattr(settings, 'TESTERS_EMAILS') and type(settings.TESTERS_EMAILS) == list:
-            tester_emails += settings.TESTERS_EMAILS
+        if hasattr(settings, 'NETS_CORE_TESTERS_EMAILS') and type(settings.TESTERS_EMAILS) == list:
+            tester_emails += settings.NETS_CORE_TESTERS_EMAILS
         
         is_tester = False
         for tester_email in tester_emails:
@@ -67,8 +158,8 @@ class VerificationCode(OwnedModel):
 
         if is_tester:
             token = 789654
-            if hasattr(settings, 'TESTERS_VERIFICATION_CODE'):
-                token = settings.TESTERS_VERIFICATION_CODE
+            if hasattr(settings, 'NETS_CORE_TESTERS_VERIFICATION_CODE'):
+                token = settings.NETS_CORE_TESTERS_VERIFICATION_CODE
 
         if not settings.DEBUG and not is_tester:
             # Check cache if token is present and return the same token
@@ -111,8 +202,23 @@ class EmailTemplate(OwnedModel):
     text_body = models.TextField(_("TXT BODY"), help_text=_("You can use Django template language see: https://docs.djangoproject.com/en/4.1/ref/templates/language/ "))
     enabled = models.BooleanField(_("Enabled?"), default=True)
     use_for = models.CharField(_("Use template for"), default='other', choices=TEMPLATES_USES, max_length=50)
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
+    
+    class Meta:
+        verbose_name = _("Email Template")
+        verbose_name_plural = _("Email Templates")
+        db_table = 'nets_core_email_template'
+        indexes = [
+            models.Index(fields=['project_content_type', 'project_id'], name='email_template_index')
+        ]
+    
     def __str__(self) -> str:
+        if self.project:
+            return f'{self.name} - {self.project}'
         return self.name
+
 
 
 
@@ -125,10 +231,18 @@ class CustomEmail(OwnedModel):
     completed = models.BooleanField(_("completed"), default=False)
     sent_count = models.IntegerField(_("Sent count"), default=0)
     failed_count = models.IntegerField(_("Failed count"), default=0)
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
+    
 
     class Meta:
         verbose_name = _("Email")
         verbose_name_plural = _("Emails")
+        db_table = 'nets_core_custom_email'
+        indexes = [
+            models.Index(fields=['project_content_type', 'project_id'], name='custom_email_index')
+        ]
 
     def __str__(self):
         return self.subject
@@ -146,10 +260,25 @@ class EmailNotification(models.Model):
     updated = models.DateTimeField(_("created"), auto_now=True)
     custom_email = models.ForeignKey(
         CustomEmail, null=True, on_delete=models.CASCADE)
+    project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    project_id = models.PositiveIntegerField(null=True, blank=True)
+    project = GenericForeignKey('project_content_type', 'project_id')
 
     def __str__(self):
+        if self.project:
+            return "%s %s %s" % (self.to, self.subject, self.project)
+        
         return "%s %s" % (self.to, self.subject)
 
+    class Meta:
+        verbose_name = _("Email Notification")
+        verbose_name_plural = _("Email Notifications")
+        db_table = 'nets_core_email_notification'
+        indexes = [
+            models.Index(fields=['project_content_type', 'project_id'], name='email_notification_index')
+        ]
+        
+        
 
 class UserDevice(OwnedModel):
     uuid = models.UUIDField(_("UUID"), default=uuid4, editable=False, unique=True)
