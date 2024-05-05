@@ -37,10 +37,28 @@ ______
 
 COMMANDS:
 _________
+
+check if settings are set correctly
+.. code-block:: bash
     
-    -./manage.py nets-settings --create # create settings required for nets_core
-    -./manage.py nets-settings  # will check if settings are set correctly
-    -./manage.py nets-settings --create --force # force create settings required for nets_core and overwrite existing settings if any
+    ./manage.py nets-settings
+
+create settings required for nets_core
+.. code-block:: bash
+    
+    ./manage.py nets-settings --create 
+
+force create settings required for nets_core and overwrite existing settings if any
+.. code-block:: bash
+
+    ./manage.py nets-settings --create --force 
+
+create superuser
+.. code-block:: bash
+
+    ./manage.py createsuperuser
+
+
 
 
 INSTALLATION

@@ -131,11 +131,7 @@ class Command(BaseCommand):
         
         # check for ROOT_URLCONF
                        
-        try:
-            root_urlconf = settings.ROOT_URLCONF
-            if 'nets_core.auth_urls' not in root_urlconf:
-                self.stdout.write(self.style.ERROR('nets_core.auth_urls not found in ROOT_URLCONF in settings.py file.'))
-        except Exception as e:
+        if not hasattr(settings, 'ROOT_URLCONF'):
             self.stdout.write(self.style.ERROR('ROOT_URLCONF not found in settings.py file.'))
             pass
         # check for MIDDLEWARE
@@ -232,9 +228,9 @@ class Command(BaseCommand):
             settings.INSTALLED_APPS.append('nets_core')
             
         # check for ROOT_URLCONF
-        if 'nets_core.auth_urls' not in settings.ROOT_URLCONF:
-            self.stdout.write(self.style.NOTICE('Adding nets_core.auth_urls to ROOT_URLCONF in settings.py file.'))
-            settings.ROOT_URLCONF = 'nets_core.auth_urls'
+        if not hasattr(settings, 'ROOT_URLCONF'):
+            self.stdout.write(self.style.NOTICE('Adding ROOT_URLCONF to settings.py file.'))
+            settings.ROOT_URLCONF = f'{project_name}.urls'
             
         # check for MIDDLEWARE
         if 'corsheaders.middleware.CorsMiddleware' not in settings.MIDDLEWARE:
