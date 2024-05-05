@@ -10,7 +10,7 @@ from django.conf import settings
 from nets_core.handlers import get_request_obj, request_params_handler
 from nets_core.params import RequestParam
 from nets_core.responses import permission_denied
-from nets_core.utils import get_client_ip
+from nets_core.utils import get_client_ip, check_perm
 
 
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def request_handler(
     obj=None, 
-    can_do: list=None, 
+    can_do: str=None, 
     perm_required: bool=False, 
     params: dict|list[RequestParam]={}, 
     optionals: dict={}, 
@@ -60,7 +60,10 @@ def request_handler(
                 for p in _params:
                     _params_dict[p.key] = p
                 _params = _params_dict
-                
+            
+            request.project = None
+            request.project_membership = None
+            
             if project_required:
                 if not hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
                     raise Exception('NETS_CORE_PROJECT_MODEL not set in settings')
@@ -97,11 +100,10 @@ def request_handler(
             
             perm = public
             if can_do:
-                # TODO: check_perm function
-                perm = True
-                # perm = check_perm(request.user, can_do[0], can_do[1], request.customer)
-                customer_id = request.customer.id if request.customer else None
-                # log_permission_check.delay(request.user.id, can_do[0], can_do[1], access=perm, customer_id=customer_id)
+                # TODO: log permission check
+                perm = check_perm(request.user, can_do, request.project)              
+                
+                # log_permission_check.delay(request.user.id, can_do, access=perm, customer_id=customer_id)
 
             if not perm and perm_required:
                 return JsonResponse({"res": 0, "message": _('permission denied')}, status=403)

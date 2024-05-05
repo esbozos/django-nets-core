@@ -111,7 +111,7 @@ _____
             RequestParam('name', str, optional=False),
         ],
         public=False, # default is False
-        can_do=['action', 'module'], # this will be check permission for action and module, if this permission does not exist this will create it, add permissions to users in admin panel
+        can_do='myapp.can_delete_object', # this will be check permission to do action, if not passed, only owner of object can do action, if permission does not exists will be created
         perm_required=False, # default is False, this will check if user has permission to do action or is owner of object, if set to TRUE only acces will be granted if can_do is passed
 
     )
@@ -185,6 +185,7 @@ example of models:
     class MyProjectMemberModel(models.Model):
         project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)
         user = models.ForeignKey(User, on_delete=models.CASCADE) # User from django.contrib.auth.models or your custom user model
+        is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)
         created_at = models.DateTimeField(auto_now_add=True)
         updated_at = models.DateTimeField(auto_now=True)
@@ -192,6 +193,7 @@ example of models:
         def __str__(self):
             return f'{self.user} - {self.project}'
 
+Setting  is_superuser to True will give user superuser permissions over project
 
 Set verification code expire time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
