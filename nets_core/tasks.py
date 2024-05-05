@@ -14,3 +14,7 @@ def send_user_devices_notifications(user_id:  int, title: str, message: str, dat
     data = {k: str(v) for k, v in data.items()}
     send_user_device_notification(user, title, message, data, channel)
 
+@shared_task
+def check_permissions(user_id: int, permission: str):
+    user = User.objects.get(id=user_id)
+    return user.has_perm(permission)
