@@ -21,15 +21,6 @@ from nets_core.utils import generate_int_uuid
 
 User = get_user_model()
 
-if hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
-    try:
-        app_label, model_name = settings.NETS_CORE_PROJECT_MODEL.split('.')
-        project_model = apps.get_model(app_label, model_name, require_ready=False)
-    except Exception as e:
-        raise Exception('NETS_CORE_PROJECT_MODEL not set correctly in settings')
-else:
-    project_model = None    
-
 token_timeout_seconds = 15*60 # 15 minutes default
 try:
     token_timeout_seconds = settings.NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS
