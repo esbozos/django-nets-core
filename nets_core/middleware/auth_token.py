@@ -44,6 +44,9 @@ class AuthTokenMiddleware(BaseMiddleware):
     Token authorization middleware for Django Channels 
     And OAUTH2 PROVIDER
     """
+    
+    def __init__(self, app):
+        self.app = app
 
     def populate_scope(self, scope):
         if "user" not in scope:
