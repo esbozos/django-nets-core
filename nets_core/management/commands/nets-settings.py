@@ -20,8 +20,7 @@ class Command(BaseCommand):
         oauth2_provider, django_celery_beat, corsheaders,  nets_core in INSTALLED_APPS
         nets-core.auth_urls in ROOT_URLCONF
         corsheaders.middleware.CorsMiddleware in MIDDLEWARE
-        oauth2_provider.middleware.OAuth2TokenMiddleware in MIDDLEWARE
-        nets_core.middleware.auth_token.AuthTokenMiddleware in MIDDLEWARE
+        oauth2_provider.middleware.OAuth2TokenMiddleware in MIDDLEWARE        
         
         site variables:
         SITE_DOMAIN = ''
@@ -144,8 +143,6 @@ class Command(BaseCommand):
             if 'oauth2_provider.middleware.OAuth2TokenMiddleware' not in middleware:
                 self.stdout.write(self.style.ERROR('oauth2_provider.middleware.OAuth2TokenMiddleware not found in MIDDLEWARE in settings.py file.'))
             
-            if 'nets_core.middleware.auth_token.AuthTokenMiddleware' not in middleware:
-                self.stdout.write(self.style.ERROR('nets_core.middleware.auth_token.AuthTokenMiddleware not found in MIDDLEWARE in settings.py file.'))
         except Exception as e:
             self.stdout.write(self.style.ERROR('MIDDLEWARE not found in settings.py file.'))
             pass
@@ -240,10 +237,6 @@ class Command(BaseCommand):
         if 'oauth2_provider.middleware.OAuth2TokenMiddleware' not in settings.MIDDLEWARE:
             self.stdout.write(self.style.NOTICE('Adding oauth2_provider.middleware.OAuth2TokenMiddleware to MIDDLEWARE in settings.py file.'))
             settings.MIDDLEWARE.append('oauth2_provider.middleware.OAuth2TokenMiddleware')
-            
-        if 'nets_core.middleware.auth_token.AuthTokenMiddleware' not in settings.MIDDLEWARE:
-            self.stdout.write(self.style.NOTICE('Adding nets_core.middleware.auth_token.AuthTokenMiddleware to MIDDLEWARE in settings.py file.'))
-            settings.MIDDLEWARE.append('nets_core.middleware.auth_token.AuthTokenMiddleware')
             
         # check for site variables
         if not hasattr(settings, 'SITE_DOMAIN'):
