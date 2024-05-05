@@ -72,6 +72,7 @@ class Role(models.Model):
     project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey('project_content_type', 'project_id')
+    enabled = models.BooleanField(_("Enabled?"), default=True)
 
     class Meta:
         verbose_name = _("Role")
