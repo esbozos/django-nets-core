@@ -40,11 +40,14 @@ class NetsCoreBaseManager(models.Manager):
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))
         
-        from nets_core.serializers import NetsCoreModelToJson
-        return NetsCoreModelToJson(self, fields).to_json()
-    
-    class Meta:
-        abstract = True
+        from nets_core.serializers import NetsCoreModelToJson, NetsCoreQuerySetToJson
+        query = self.get_queryset()
+        
+        if query.count() == 1:
+            return NetsCoreModelToJson(query.first(), fields).to_json()
+        
+        return NetsCoreQuerySetToJson(query, fields).to_json()
+
 
 class NetsCoreBaseModel(models.Model):
     created = models.DateTimeField(_('Created'), auto_now_add=True)
