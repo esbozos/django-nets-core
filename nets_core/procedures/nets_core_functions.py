@@ -13,17 +13,20 @@ def create_nets_core_functions(using: str = "default"):
     
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"Creating nets_core functions for {using} database")
+    
     
     connection = connections[using]
     engine = connection.vendor
-    function_files = Path(__file__).parent / "functions"
-    for file in function_files.iterdir():
+    logger.warning(f"Creating nets_core functions for {using} database engine {engine}")
+    function_files = os.path.join(Path(__file__).parent, "functions")
+    for file in os.scandir(function_files):
         if file.is_file():
-            if f"nets_core_{engine}" in file.name:
-                logger.info(f"Creating function from {file}")
-                with open(file, "r") as f:
-                    connection.cursor().execute(f.read())
+            if file.name.startswith(f"nets_core_{engine}"):
+                with open(file.path, "r") as f:
+                    query = f.read()
+                    logger.warning(f"Executing {file.name} function")
+                    with connection.cursor() as cursor:
+                        cursor.execute(query)
     connection.close()
     return True
 

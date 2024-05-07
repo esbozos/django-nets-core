@@ -31,8 +31,8 @@ BEGIN
     _fields := fields;
     _object_id := object_id;
     -- enclose fields in double quotes to avoid SQL injection
-    _fields := REPLACE(_fields, ',', '","');
-    _fields := format('t1."%s"', _fields);
+    fields := REPLACE(fields, ',', '",t1."');
+    fields := format('t1."%s"', fields);
     -- invoke dynamic SQL to convert model to JSON object, each fiel should be t1."field_name" using t1 as alias for the model
     EXECUTE format('SELECT row_to_json(t) FROM (SELECT %s FROM %s t1 WHERE id = %s) t', _fields, _model, _object_id) INTO _json;
     
@@ -53,9 +53,10 @@ BEGIN
     _fields := fields;
     _object_ids := object_ids;
     -- enclose fields in double quotes to avoid SQL injection
-    _fields := REPLACE(_fields, ',', '","');
-    _fields := format('t1."%s"', _fields);
+    
     -- invoke dynamic SQL to convert model to JSON object, each fiel should be t1."field_name" using t1 as alias for the model
+    fields := REPLACE(fields, ',', '",t1."');
+    fields := format('t1."%s"', fields);
     EXECUTE format('SELECT json_agg(row_to_json(t)) FROM (SELECT %s FROM %s t1 WHERE id = ANY(%s)) t', _fields, _model, _object_ids) INTO _json;
     
     RETURN _json;

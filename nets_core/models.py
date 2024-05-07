@@ -34,8 +34,10 @@ class NetsCoreBaseManager(models.Manager):
         if not fields:
             raise ValueError(_("Fields must be provided"))
         if fields == '__all__':
-            # get fiels to tupple
-            fields = tuple([field.name for field in self.model._meta.fields])
+            # get fiels to tupple but names from columns in db table schema, user should be user_id
+            schema = self.model._meta.get_fields()
+            fields = tuple([field.column for field in schema if hasattr(field, 'column')])
+            
         
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))
@@ -57,8 +59,24 @@ class NetsCoreBaseModel(models.Model):
 
     class Meta:
         abstract = True
+        
+    def to_json(self, fields: tuple = None):
+        if not fields:
+            raise ValueError(_("Fields must be provided"))
+        if fields == '__all__':
+            # get fiels to tupple but names from columns in db table schema, user should be user_id
+            schema = self._meta.get_fields()
+            fields = tuple([field.column for field in schema if hasattr(field, 'column')])
+            
+        
+        if not isinstance(fields, tuple):
+            raise ValueError(_("Fields must be a tuple"))
+        
+        from nets_core.serializers import NetsCoreModelToJson
+        return NetsCoreModelToJson(self, fields).to_json()
 
-class OwnedModel(models.Model):
+
+class OwnedModel(NetsCoreBaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
@@ -68,7 +86,7 @@ class OwnedModel(models.Model):
     class Meta:
         abstract = True
 
-class Permission(models.Model):
+class Permission(NetsCoreBaseModel):
     name = models.CharField(_("Name"), max_length=150)
     codename = models.CharField(_("Codename"), max_length=150)
     description = models.CharField(_("Description"), max_length=250, null=True, blank=True)
@@ -98,7 +116,7 @@ class Permission(models.Model):
             
         super(Permission, self).save(*args, **kwargs)
         
-class Role(models.Model):
+class Role(NetsCoreBaseModel):
     name = models.CharField(_("Name"), max_length=150)
     codename = models.CharField(_("Codename"), max_length=150)
     description = models.CharField(_("Description"), max_length=250)
@@ -127,8 +145,8 @@ class Role(models.Model):
         self.codename = self.codename.lower()
         super(Role, self).save(*args, **kwargs)
         
-class UserRole(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+class UserRole(NetsCoreBaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='roles')
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
     project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     project_id = models.PositiveIntegerField(null=True, blank=True)
@@ -277,7 +295,7 @@ class CustomEmail(OwnedModel):
     def __str__(self):
         return self.subject
 
-class EmailNotification(models.Model):
+class EmailNotification(NetsCoreBaseModel):
     subject = models.CharField(_("subject"), max_length=250)
     to = models.TextField(_("To Email"), max_length=250)
     from_email = models.CharField(_("From Email"), max_length=250)

@@ -172,7 +172,10 @@ example of models:
 
 .. code-block:: python
 
-    class MyProjectModel(models.Model):
+    from nets_core.models import OwnedModel, NetsCoreBaseModel
+    # use of OwnedModel is optional, but recommended to include user, created and updated fields, 
+    # if not used, include user, created and updated fields in your model
+    class MyProjectModel(OwnedModel):
         name = models.CharField(max_length=255)
         enabled = models.BooleanField(default=True)
         description = models.TextField(blank=True, null=True)
@@ -182,9 +185,8 @@ example of models:
         def __str__(self):
             return self.name
 
-    class MyProjectMemberModel(models.Model):
-        project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)
-        user = models.ForeignKey(User, on_delete=models.CASCADE) # User from django.contrib.auth.models or your custom user model
+    class MyProjectMemberModel(OwnedModel):
+        project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)        
         is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)
         created_at = models.DateTimeField(auto_now_add=True)
@@ -193,7 +195,14 @@ example of models:
         def __str__(self):
             return f'{self.user} - {self.project}'
 
-Setting  is_superuser to True will give user superuser permissions over project
+Setting  is_superuser to True will give user superuser permissions over project, OwnedModel is Abstract model that include user, created and updated fields
+
+.. warning::
+
+    NetsCoreBaseModel is an abstract model that include created and updated fields and implements to_json method that allow to serialize model to json
+    passing fields as tuple to include or "__all__" to include. This is a store function in database for fast access to json data.
+    TODO: include examples of use to serialize model to json based on fields required per view or endpoint. Inspired in Facebook GraphQL
+
 
 Set verification code expire time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
