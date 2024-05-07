@@ -1,6 +1,6 @@
 from nets_core.firebase_messages import send_user_device_notification
 from nets_core.models import VerificationCode
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import post_delete, post_save, pre_delete, post_migrate, post_init
 from django.dispatch import receiver
 from nets_core.mail import send_email
 from nets_core.models import EmailTemplate

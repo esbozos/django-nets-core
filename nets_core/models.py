@@ -28,10 +28,39 @@ except Exception as e:
     # Settings not present use default
     pass
 
+class NetsCoreBaseManager(models.Manager):
+    
+    def to_json(self, fields: tuple = None):
+        if not fields:
+            raise ValueError(_("Fields must be provided"))
+        if fields == '__all__':
+            # get fiels to tupple
+            fields = tuple([field.name for field in self.model._meta.fields])
+        
+        if not isinstance(fields, tuple):
+            raise ValueError(_("Fields must be a tuple"))
+        
+        from nets_core.serializers import NetsCoreModelToJson
+        return NetsCoreModelToJson(self, fields).to_json()
+    
+    class Meta:
+        abstract = True
+
+class NetsCoreBaseModel(models.Model):
+    created = models.DateTimeField(_('Created'), auto_now_add=True)
+    updated = models.DateTimeField(_('updated'), auto_now=True)
+    
+    objects = NetsCoreBaseManager()
+
+    class Meta:
+        abstract = True
+
 class OwnedModel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
+    
+    objects = NetsCoreBaseManager()
 
     class Meta:
         abstract = True
@@ -43,6 +72,8 @@ class Permission(models.Model):
     project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True, related_name='nets_core_permissions')
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey('project_content_type', 'project_id')
+    
+    objects = NetsCoreBaseManager()
 
     class Meta:
         verbose_name = _("Permission")
@@ -74,6 +105,8 @@ class Role(models.Model):
     project = GenericForeignKey('project_content_type', 'project_id')
     enabled = models.BooleanField(_("Enabled?"), default=True)
 
+    objects = NetsCoreBaseManager()
+    
     class Meta:
         verbose_name = _("Role")
         verbose_name_plural = _("Roles")
@@ -98,6 +131,8 @@ class UserRole(models.Model):
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey('project_content_type', 'project_id')
 
+    objects = NetsCoreBaseManager()
+    
     class Meta:
         verbose_name = _("User Role")
         verbose_name_plural = _("User Roles")
