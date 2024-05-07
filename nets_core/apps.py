@@ -5,9 +5,10 @@ logger = logging.getLogger(__name__)
 
 def post_migrate_handler(sender, **kwargs):
     from nets_core.procedures import nets_core_functions
+    using = kwargs.get("using")
     # add style colors to logger    
     logger.warning("Creating nets_core functions")    
-    nets_core_functions.create_nets_core_functions()
+    nets_core_functions.create_nets_core_functions(using=using)
     
 class UsersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
