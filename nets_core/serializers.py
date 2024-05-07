@@ -27,7 +27,7 @@ class NetsCoreQuerySetToJson():
     def to_json(self):
         query_ids = ", ".join([str(obj.pk) for obj in self.queryset])
         with models.connections[self.using].cursor() as cursor:
-            cursor.execute(f"SELECT nets_core_postgre_array_model_to_json({self.queryset.model._meta.db_table}, {self.fields}, ARRAY[{query_ids}])")
+            cursor.execute(f"SELECT nets_core_postgre_array_model_to_json('{self.queryset.model._meta.db_table}', '{self.fields}', ARRAY[{query_ids}])")
             row = cursor.fetchone()
             return json.dumps(dict(zip(self.fields, row)))
     
@@ -56,7 +56,7 @@ class NetsCoreModelToJson():
         
     def to_json(self):
         with connections[self.using].cursor() as cursor:
-            cursor.execute(f"SELECT nets_core_postgre_model_to_json({self.instance._meta.db_table}, {self.fields}), self.instance.pk")
+            cursor.execute(f"SELECT nets_core_postgre_model_to_json('{self.instance._meta.db_table}', '{self.fields}', self.instance.pk)")
             row = cursor.fetchone()
             return json.dumps(dict(zip(self.fields, row)))
         
