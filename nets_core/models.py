@@ -19,7 +19,7 @@ from django.contrib.auth import get_user_model
 from nets_core.utils import generate_int_uuid
 
 
-User = get_user_model()
+
 
 token_timeout_seconds = 15*60 # 15 minutes default
 try:
@@ -77,7 +77,7 @@ class NetsCoreBaseModel(models.Model):
 
 
 class OwnedModel(NetsCoreBaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
     
@@ -146,7 +146,7 @@ class Role(NetsCoreBaseModel):
         super(Role, self).save(*args, **kwargs)
         
 class UserRole(NetsCoreBaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='roles')
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='roles')
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
     project_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     project_id = models.PositiveIntegerField(null=True, blank=True)
