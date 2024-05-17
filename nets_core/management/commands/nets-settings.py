@@ -71,6 +71,13 @@ class Command(BaseCommand):
         'CACHES',
         'ASGI_APPLICATION',
         'CHANNEL_LAYERS',
+        'SESSION_ENGINE',
+        'SESSION_COOKIE_NAME',
+        'SESSION_COOKIE_AGE',
+        'SESSION_COOKIE_SECURE',
+        'SESSION_COOKIE_SAMESITE',
+        'CACHE_MIDDLEWARE_KEY_PREFIX',
+        'AUTHENTICATION_BACKENDS',
     ]
     
     def add_arguments(self, parser):
@@ -80,18 +87,30 @@ class Command(BaseCommand):
         parser.add_argument('--site-name', type=str, help='Site name')
         
     def handle(self, *args, **options):
+        from django.conf import settings
+        base_dir = settings.BASE_DIR
+        
         create = options.get('create')
         force = options.get('force')
         site_domain = options.get('site_domain')
         site_name = options.get('site_name')
         
-        if not site_domain:
-            site_domain = input('Enter the site domain: ')
         
-        if not site_name:
-            site_name = input('Enter the site name: ')
         
-        if create:
+        if create:            
+            if not site_domain:
+                if hasattr(settings, 'SITE_DOMAIN'):
+                    site_domain = settings.SITE_DOMAIN
+                else:
+                    
+                    site_domain = input('Enter the site domain: ')
+        
+            if not site_name:
+                if hasattr(settings, 'SITE_NAME'):
+                    site_name = settings.SITE_NAME
+                else:
+                    site_name = input('Enter the site name: ')
+        
             self.create_files(site_domain, site_name, force=force)
         
         else:
@@ -171,7 +190,39 @@ class Command(BaseCommand):
             self.stdout.write(self.style.NOTICE('ENV not found in settings.py file. This is optional.'))
             pass
             
-            
+        
+        try:
+            asgi_application = settings.ASGI_APPLICATION
+        except Exception as e:
+            self.stdout.write(self.style.ERROR('ASGI_APPLICATION not found in settings.py file.'))
+            pass
+        
+        try:
+            channel_layers = settings.CHANNEL_LAYERS
+        except Exception as e:
+            self.stdout.write(self.style.ERROR('CHANNEL_LAYERS not found in settings.py file.'))
+            pass
+        
+        try:
+            caches = settings.CACHES
+        except Exception as e:
+            self.stdout.write(self.style.ERROR('CACHES not found in settings.py file.'))
+            pass
+        
+        try:
+            session_engine = settings.SESSION_ENGINE
+            session_cookie_name = settings.SESSION_COOKIE_NAME
+            session_cookie_age = settings.SESSION_COOKIE_AGE
+            session_cookie_secure = settings.SESSION_COOKIE_SECURE
+            session_cookie_samesite = settings.SESSION_COOKIE_SAMESITE
+            cache_middleware_key_prefix = settings.CACHE_MIDDLEWARE_KEY_PREFIX
+            authentication_backends = settings.AUTHENTICATION_BACKENDS
+        except Exception as e:
+            self.stdout.write(self.style.ERROR('Session settings not found in settings.py file.'))
+            pass
+        
+        
+        
     def create_files(self, site_domain, site_name, force=False):
         time = datetime.now().strftime('%Y%m%d%H%M%S')
         # create the missing files and add the required settings.
@@ -346,7 +397,39 @@ class Command(BaseCommand):
                     "BACKEND": "channels.layers.InMemoryChannelLayer"
                 }
             }           
-                                   
+        
+        if not hasattr(settings, 'SESSION_ENGINE'):
+            self.stdout.write(self.style.NOTICE('Adding SESSION_ENGINE to settings.py file.'))
+            settings.SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+            
+        if not hasattr(settings, 'SESSION_COOKIE_NAME'):
+            self.stdout.write(self.style.NOTICE('Adding SESSION_COOKIE_NAME to settings.py file.'))
+            base_domain = settings.SITE_DOMAIN.split('.')
+            settings.SESSION_COOKIE_NAME = f'{base_domain[0]}_session'
+            
+        if not hasattr(settings, 'SESSION_COOKIE_AGE'):
+            self.stdout.write(self.style.NOTICE('Adding SESSION_COOKIE_AGE to settings.py file.'))
+            settings.SESSION_COOKIE_AGE = 60 * 60 * 24 * 7
+            
+        if not hasattr(settings, 'SESSION_COOKIE_SECURE'):
+            self.stdout.write(self.style.NOTICE('Adding SESSION_COOKIE_SECURE to settings.py file.'))
+            settings.SESSION_COOKIE_SECURE = True
+            
+        if not hasattr(settings, 'SESSION_COOKIE_SAMESITE'):
+            self.stdout.write(self.style.NOTICE('Adding SESSION_COOKIE_SAMESITE to settings.py file.'))
+            settings.SESSION_COOKIE_SAMESITE = 'None'
+            
+        if not hasattr(settings, 'CACHE_MIDDLEWARE_KEY_PREFIX'):
+            self.stdout.write(self.style.NOTICE('Adding CACHE_MIDDLEWARE_KEY_PREFIX to settings.py file.'))
+            base_domain = settings.SITE_DOMAIN.split('.')
+            settings.CACHE_MIDDLEWARE_KEY_PREFIX = f'{base_domain[0]}'
+            
+        if not hasattr(settings, 'AUTHENTICATION_BACKENDS'):
+            self.stdout.write(self.style.NOTICE('Adding AUTHENTICATION_BACKENDS to settings.py file.'))
+            settings.AUTHENTICATION_BACKENDS = [
+                'oauth2_provider.backends.OAuth2Backend',
+                'django.contrib.auth.backends.ModelBackend',             
+            ]
         
         # create celery.py file
         celery_py = os.path.join(base_dir, f'{project_name}/celery.py')
