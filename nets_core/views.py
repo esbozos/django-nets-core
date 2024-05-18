@@ -234,10 +234,18 @@ def auth_logout(request):
     return success_response(_("Logged out successfully"))
 
 
-@request_handler()
+@request_handler(
+    params=[
+        RequestParam("fields", list)
+    ]
+)
 def auth_get_profile(request):
     request.user.save()
-    return success_response(request.user.to_json())
+    fields = request.params.fields 
+    # convert list in tuple
+    fields = tuple(fields)   
+        
+    return success_response(request.user.to_json(fields=fields))
 
 
 @request_handler()
