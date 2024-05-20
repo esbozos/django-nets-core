@@ -18,9 +18,6 @@ from django.contrib.auth import get_user_model
 
 from nets_core.utils import generate_int_uuid
 
-
-
-
 token_timeout_seconds = 15*60 # 15 minutes default
 try:
     token_timeout_seconds = settings.NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS
@@ -54,6 +51,7 @@ class NetsCoreBaseManager(models.Manager):
 class NetsCoreBaseModel(models.Model):
     created = models.DateTimeField(_('Created'), auto_now_add=True)
     updated = models.DateTimeField(_('updated'), auto_now=True)
+    updated_fields = models.JSONField(_("Updated fields"), null=True, blank=True, default=dict)
     
     objects = NetsCoreBaseManager()
 
@@ -74,12 +72,31 @@ class NetsCoreBaseModel(models.Model):
         
         from nets_core.serializers import NetsCoreModelToJson
         return NetsCoreModelToJson(self, fields).to_json()
+    
+    def save(self, *args, **kwargs):
+        # implements updated fields to be updated
+        if hasattr(self, 'updated_fields') and self.pk:
+            # read from db the instance and compare the fields
+            instance = self.__class__.objects.get(pk=self.pk)            
+            # get all fields from instance            
+            for field in instance._meta.get_fields():
+                if getattr(instance, field.name) != getattr(self, field.name):
+                    if not field.name in self.updated_fields:
+                        self.updated_fields[field.name] = []
+                    self.updated_fields[field.name].append({
+                        'old': getattr(instance, field.name),
+                        'new': getattr(self, field.name),
+                        'time': timezone.now().__str__()
+                    })
+        
+        else:
+            self.updated_fields = {}        
+                
+        super(NetsCoreBaseModel, self).save(*args, **kwargs)
 
 
 class OwnedModel(NetsCoreBaseModel):
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
-    created = models.DateTimeField(_('Created'), auto_now_add=True)
-    updated = models.DateTimeField(_('updated'), auto_now=True)
     
     objects = NetsCoreBaseManager()
 
@@ -340,11 +357,14 @@ class UserDevice(OwnedModel):
     active = models.BooleanField(_("Active"), default=True)
     last_login = models.DateTimeField(_("Last login"), null=True)
     ip = models.CharField(_("IP"), max_length=250, null=True, blank=True)
+    
+    PROTECTED_FIELDS = ['device_token', 'firebase_token']
 
     class Meta:
         verbose_name = _("User Device")
         verbose_name_plural = _("User Devices")
         db_table = 'nets_core_user_device'
+
 
 
     def __str__(self):

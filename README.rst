@@ -60,7 +60,6 @@ create superuser
 
 
 
-
 INSTALLATION
 ____________
 
@@ -180,7 +179,9 @@ example of models:
         enabled = models.BooleanField(default=True)
         description = models.TextField(blank=True, null=True)
         created_at = models.DateTimeField(auto_now_add=True)
-        updated_at = models.DateTimeField(auto_now=True)
+        updated_at = models.DateTimeField(auto_now=True)        
+
+        PROTECTED_FIELDS = ['user']
 
         def __str__(self):
             return self.name
@@ -190,18 +191,54 @@ example of models:
         is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)
         created_at = models.DateTimeField(auto_now_add=True)
-        updated_at = models.DateTimeField(auto_now=True)
+        updated_at = models.DateTimeField(auto_now=True)        
+
+        PROTECTED_FIELDS = ['is_superuser', 'project']
 
         def __str__(self):
             return f'{self.user} - {self.project}'
 
 Setting  is_superuser to True will give user superuser permissions over project, OwnedModel is Abstract model that include user, created and updated fields
 
-.. warning::
+.. warning:: 
 
-    NetsCoreBaseModel is an abstract model that include created and updated fields and implements to_json method that allow to serialize model to json
-    passing fields as tuple to include or "__all__" to include. This is a store function in database for fast access to json data.
+   The `NetsCoreBaseModel` is an abstract model that includes `created` and `updated` fields. It implements a `to_json` method that allows the model to be serialized to JSON. This method accepts fields as a tuple to include or `"__all__"` to include all fields. This is a stored function in the database for fast access to JSON data.
+
+   `PROTECTED_FIELDS` is a list of fields that will not be exposed, even if the request includes these fields. If `PROTECTED_FIELDS` is not set, all fields that contain any `NETS_CORE_GLOBAL_PROTECTED_FIELDS` will be removed from the response. For example, fields such as `'old_password'`, `'password'`, `'origin_ip'`, `'ip'` will be removed from the response if not set in `PROTECTED_FIELDS` in your model class. You can set `NETS_CORE_GLOBAL_PROTECTED_FIELDS` in your `settings.py` to replace the default fields to be protected.
+
+   `NetsCoreBaseModel` includes `updated_fields`, which is a `JSONField` that will store changes in the model. This field will be updated by `nets_core` when the model is updated. This is useful for tracking changes in the model. Do not make changes to this field, as it will be updated by `nets_core`.
+
+   `OwnerModel` extends `NetsCoreBaseModel` and includes a `user` field. This is useful for tracking the ownership of the model and will be used to check if a user is the owner of the model.
+
     TODO: include examples of use to serialize model to json based on fields required per view or endpoint. Inspired in Facebook GraphQL
+
+
+set NETS_CORE_GLOBAL_PROTECTED_FIELDS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    NETS_CORE_PROTECTED_FIELDS = [
+        'password',
+        'is_active',
+        'enabled',
+        'staff',
+        'superuser',
+        'verified',
+        'deleted',
+        'token',
+        'auth',
+        'perms',
+        'groups',
+        'ip',
+        'email',
+        'doc',
+        'permissions',
+        'date_joined',
+        'last_login',
+        'verified',
+        'updated_fields'
+    ] # default fields to be protected
 
 
 Set verification code expire time
@@ -258,6 +295,9 @@ Set cache key to store verification code, default is 'NC_T'
 
 Set prohibited fields
 ^^^^^^^^^^^^^^^^^^^^^
+
+.. warning::
+    This will be deprecated in future versions, use PROTECTED_FIELDS in your model class to exclude fields from being updated by auth.urls
 
 nets_core.auth_urls provide endpoints to update user model fields, you can exclude some fields from being updated by auth.urls
 

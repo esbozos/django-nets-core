@@ -1,6 +1,25 @@
 import json
 from django.db import models, connections
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+
+GLOBAL_PROTECTED_FIELDS = [
+    'password',
+    'is_active',
+    'enabled',
+    'staff',
+    'superuser',
+    'verified',
+    'deleted',
+    'token',
+    'auth',
+    'perms',
+    'groups',
+    'ip'
+]
+
+if hasattr(settings, "NETS_CORE_GLOBAL_PROTECTED_FIELDS"):
+    GLOBAL_PROTECTED_FIELDS = settings.NETS_CORE_GLOBAL_PROTECTED_FIELDS
 
 class NetsCoreQuerySetToJson():
     
@@ -21,10 +40,26 @@ class NetsCoreQuerySetToJson():
             raise ValueError(_("Database alias not found"))
         
         self.queryset = queryset
+        if len(queryset) > 1:
+            instance = queryset.first()
+            # check if instance has protected_fields
+            if hasattr(instance, "PROTECTED_FIELDS"):
+                # get the protected fields
+                protected_fields = [f.lower() for f in instance.PROTECTED_FIELDS]
+                # remove the protected fields from the fields
+                self.fields = [field for field in fields if field.lower() not in protected_fields]
+                
+            else:
+                # remove the global protected fields from the fields using contains for each GLOBAL_PROTECTED_FIELDS
+                for field in GLOBAL_PROTECTED_FIELDS:
+                    for i, f in enumerate(fields):
+                        if field.lower() in f.lower():
+                            fields = fields[:i] + fields[i+1:]
         self.fields = ", ".join(fields)
         self.using = using
         
     def to_json(self):
+        
         query_ids = ", ".join([str(obj.pk) for obj in self.queryset])
         with models.connections[self.using].cursor() as cursor:
             cursor.execute(f"SELECT nets_core_postgre_array_model_to_json('{self.queryset.model._meta.db_table}', '{self.fields}', ARRAY[{query_ids}])")
@@ -50,7 +85,22 @@ class NetsCoreModelToJson():
         if not using in connections.databases:
             raise ValueError(_("Database alias not found"))
         
-        self.instance = instance 
+        self.instance = instance
+
+        # check if instance has protected_fields
+        if hasattr(instance, "protected_fields"):
+            # get the protected fields
+            protected_fields = [f.lower() for f in instance.protected_fields]
+            # remove the protected fields from the fields
+            self.fields = [field for field in fields if field.lower() not in protected_fields]
+            
+        else:
+            # remove the global protected fields from the fields
+            for field in GLOBAL_PROTECTED_FIELDS:
+                for i, f in enumerate(fields):
+                    if field.lower() in f.lower():
+                        fields = fields[:i] + fields[i+1:]
+
         self.fields = ", ".join(fields)
         self.using = using
         
