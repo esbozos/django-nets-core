@@ -28,7 +28,18 @@ class NetsCoreQuerySetToJson():
     
     def __init__(self, queryset: models.QuerySet, fields: tuple = None, using: str = "default"):
         if not fields:
-            raise ValueError(_("Fields must be provided"))
+            # check if instance has JSON_FIELDS attribute
+            if hasattr(queryset.model, "JSON_DATA_FIELDS"):
+                if not queryset.model.JSON_DATA_FIELDS:
+                    raise ValueError(_("Fields must be provided"))
+                if not isinstance(queryset.model.JSON_DATA_FIELDS, tuple):
+                    try:
+                        fields = tuple(queryset.model.JSON_DATA_FIELDS)
+                    except Exception as e:
+                        raise ValueError(_("Fields must be a tuple or list"))
+            else:
+                
+                raise ValueError(_("Fields must be provided"))
         
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))
@@ -74,7 +85,18 @@ class NetsCoreModelToJson():
 
     def __init__(self, instance: models.Model, fields: tuple = None, using: str = "default"):
         if not fields:
-            raise ValueError(_("Fields must be provided"))
+            # check if instance has JSON_FIELDS attribute
+            if hasattr(instance, "JSON_DATA_FIELDS"):
+                if not instance.JSON_DATA_FIELDS:
+                    raise ValueError(_("Fields must be provided"))
+                if not isinstance(instance.JSON_DATA_FIELDS, tuple):
+                    try:
+                        fields = tuple(instance.JSON_DATA_FIELDS)
+                    except Exception as e:
+                        raise ValueError(_("Fields must be a tuple or list"))
+            else:
+                raise ValueError(_("Fields must be provided"))            
+            
         
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))

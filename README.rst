@@ -178,10 +178,9 @@ example of models:
         name = models.CharField(max_length=255)
         enabled = models.BooleanField(default=True)
         description = models.TextField(blank=True, null=True)
-        created_at = models.DateTimeField(auto_now_add=True)
-        updated_at = models.DateTimeField(auto_now=True)        
 
         PROTECTED_FIELDS = ['user']
+        JSON_DATA_FIELDS=['name', 'description', 'enabled', 'created', 'updated' ] # OPTIONAL, but recommended is extends OwnedModel or NetsCoreBaseModel , fields to include in json data if to_json is called witout fields parameter
 
         def __str__(self):
             return self.name
@@ -195,12 +194,11 @@ example of models:
     class MyProjectMemberModel(OwnedModel):
         project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)        
         is_superuser = models.BooleanField(default=False)
-        enabled = models.BooleanField(default=True)
-        created_at = models.DateTimeField(auto_now_add=True)
-        updated_at = models.DateTimeField(auto_now=True)        
+        enabled = models.BooleanField(default=True)    
         role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')
 
         PROTECTED_FIELDS = ['is_superuser', 'project']
+        
 
         def __str__(self):
             return f'{self.user} - {self.project}'
