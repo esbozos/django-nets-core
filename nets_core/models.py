@@ -28,6 +28,21 @@ except Exception as e:
 class NetsCoreBaseManager(models.Manager):
     
     def to_json(self, fields: tuple = None):
+        query = self.get_queryset()
+        if not query:
+            raise ValueError(_("Query must be provided"))
+        
+        # get the query instance and check if JSON_DATA_FIELDS is present
+        if hasattr(self.model, "JSON_DATA_FIELDS") and not fields:
+            if not self.model.JSON_DATA_FIELDS:
+                raise ValueError(_("Fields must be provided"))
+            if not isinstance(self.model.JSON_DATA_FIELDS, tuple):
+                try:
+                    fields = tuple(self.model.JSON_DATA_FIELDS)
+                except Exception as e:
+                    raise ValueError(_("Fields must be a tuple or list"))
+        
+        
         if not fields:
             raise ValueError(_("Fields must be provided"))
         if fields == '__all__':
@@ -40,7 +55,7 @@ class NetsCoreBaseManager(models.Manager):
             raise ValueError(_("Fields must be a tuple"))
         
         from nets_core.serializers import NetsCoreModelToJson, NetsCoreQuerySetToJson
-        query = self.get_queryset()
+
         
         if query.count() == 1:
             return NetsCoreModelToJson(query.first(), fields).to_json()
@@ -59,6 +74,16 @@ class NetsCoreBaseModel(models.Model):
         abstract = True
         
     def to_json(self, fields: tuple = None):
+        # check if JSON_DATA_FIELDS is present
+        if hasattr(self, "JSON_DATA_FIELDS") and not fields:
+            if not self.JSON_DATA_FIELDS:
+                raise ValueError(_("Fields must be provided"))
+            if not isinstance(self.JSON_DATA_FIELDS, tuple):
+                try:
+                    fields = tuple(self.JSON_DATA_FIELDS)
+                except Exception as e:
+                    raise ValueError(_("Fields must be a tuple or list"))
+        
         if not fields:
             raise ValueError(_("Fields must be provided"))
         if fields == '__all__':
@@ -83,7 +108,7 @@ class NetsCoreBaseModel(models.Model):
                 if not hasattr(field, 'column'):
                     continue
                 if getattr(instance, field.name) != getattr(self, field.name):
-                    if not field.name in self.updated_fields:
+                    if not field.name in self.updated_fields and not field.name in ['created', 'updated', 'updated_fields']:
                         self.updated_fields[field.name] = []
                     self.updated_fields[field.name].append({
                         'old': str(getattr(instance, field.name)),
