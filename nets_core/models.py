@@ -80,6 +80,8 @@ class NetsCoreBaseModel(models.Model):
             instance = self.__class__.objects.get(pk=self.pk)            
             # get all fields from instance            
             for field in instance._meta.get_fields():
+                if not hasattr(field, 'column'):
+                    continue
                 if getattr(instance, field.name) != getattr(self, field.name):
                     if not field.name in self.updated_fields:
                         self.updated_fields[field.name] = []
