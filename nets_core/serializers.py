@@ -113,9 +113,9 @@ class NetsCoreModelToJson():
         self.instance = instance
 
         # check if instance has protected_fields
-        if hasattr(instance, "protected_fields"):
+        if hasattr(instance, "PROTECTED_FIELDS"):
             # get the protected fields
-            protected_fields = [f.lower() for f in instance.protected_fields]
+            protected_fields = [f.lower() for f in instance.PROTECTED_FIELDS]
             # remove the protected fields from the fields
             self.fields = [field for field in fields if field.lower() not in protected_fields]
             

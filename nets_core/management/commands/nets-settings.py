@@ -87,6 +87,7 @@ class Command(BaseCommand):
         "CORS_ALLOW_METHODS",
         "CORS_ORIGIN_ALLOW_ALL",
         "CORS_EXPOSE_HEADERS",
+        "CORS_ALLOW_CREDENTIALS"
     ]
 
     def add_arguments(self, parser):
@@ -283,9 +284,10 @@ class Command(BaseCommand):
             cors_allow_methods = settings.CORS_ALLOW_METHODS
             cors_origin_allow_all = settings.CORS_ORIGIN_ALLOW_ALL
             cors_expose_headers = settings.CORS_EXPOSE_HEADERS
+            cors_allow_credentials = settings.CORS_ALLOW_CREDENTIALS
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR("Security settings not found in settings.py file.")
+                self.style.ERROR("CORS and/or csrf settings not found in settings.py file.")
             )
             pass
 
@@ -721,6 +723,7 @@ class Command(BaseCommand):
                 f"https://localhost:8000",
             ]
 
+        
         # check for urls.py file
         urls_py = os.path.join(base_dir, f"{project_name}/urls.py")
         if not os.path.exists(urls_py):
