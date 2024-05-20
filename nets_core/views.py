@@ -198,7 +198,7 @@ def auth(request):
             client_secret=request.params.client_secret,
             device_uuid=device_uuid,
         )
-        if not user.email_verified:
+        if hasattr(user, "email_verified") and not user.email_verified:
             user.email_verified = True
         user.last_login = timezone.now()
         user.save()
