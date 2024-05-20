@@ -186,22 +186,46 @@ example of models:
         def __str__(self):
             return self.name
 
+    MEMBER_ROLES = [
+        ('superuser', 'Superuser'),
+        ('member', 'Member'),
+        ('admin', 'Admin'),
+        ('viewer', 'Viewer')
+    ]
     class MyProjectMemberModel(OwnedModel):
         project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)        
         is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)
         created_at = models.DateTimeField(auto_now_add=True)
         updated_at = models.DateTimeField(auto_now=True)        
+        role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')
 
         PROTECTED_FIELDS = ['is_superuser', 'project']
 
         def __str__(self):
             return f'{self.user} - {self.project}'
 
+
+        # example of custom method to convert member to json
+        # each model that extends OwnedModel or NetsCoreBaseModel
+        # has a to_json method that can be used to convert the model to json    
+        def member_to_json(self):
+            """
+            Convert the member object to a JSON representation.
+
+            :return: A dictionary representing the member object in JSON format.
+            """
+            return {
+                'id': self.id,
+                'project_id': self.project.id,
+                'user_id': self.user.id,
+                'role': self.role,
+                'user': self.user.to_json(fields=('id', 'first_name', 'last_name')),
+            }
+
 Setting  is_superuser to True will give user superuser permissions over project, OwnedModel is Abstract model that include user, created and updated fields
 
-.. warning:: 
-
+.. warning::
    The `NetsCoreBaseModel` is an abstract model that includes `created` and `updated` fields. It implements a `to_json` method that allows the model to be serialized to JSON. This method accepts fields as a tuple to include or `"__all__"` to include all fields. This is a stored function in the database for fast access to JSON data.
 
    `PROTECTED_FIELDS` is a list of fields that will not be exposed, even if the request includes these fields. If `PROTECTED_FIELDS` is not set, all fields that contain any `NETS_CORE_GLOBAL_PROTECTED_FIELDS` will be removed from the response. For example, fields such as `'old_password'`, `'password'`, `'origin_ip'`, `'ip'` will be removed from the response if not set in `PROTECTED_FIELDS` in your model class. You can set `NETS_CORE_GLOBAL_PROTECTED_FIELDS` in your `settings.py` to replace the default fields to be protected.

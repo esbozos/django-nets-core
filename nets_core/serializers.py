@@ -16,6 +16,9 @@ GLOBAL_PROTECTED_FIELDS = [
     'perms',
     'groups',
     'ip'
+    'date_joined',
+    'last_login',
+    
 ]
 
 if hasattr(settings, "NETS_CORE_GLOBAL_PROTECTED_FIELDS"):
@@ -64,7 +67,7 @@ class NetsCoreQuerySetToJson():
         with models.connections[self.using].cursor() as cursor:
             cursor.execute(f"SELECT nets_core_postgre_array_model_to_json('{self.queryset.model._meta.db_table}', '{self.fields}', ARRAY[{query_ids}])")
             row = cursor.fetchone()
-            return json.loads(json.dumps(dict(zip(self.fields, row))))
+            return row[0]
     
 
 class NetsCoreModelToJson():
@@ -108,5 +111,7 @@ class NetsCoreModelToJson():
         with connections[self.using].cursor() as cursor:
             cursor.execute(f"SELECT nets_core_postgre_model_to_json('{self.instance._meta.db_table}', '{self.fields}', {self.instance.pk})")
             row = cursor.fetchone()
-            return json.loads(json.dumps(dict(zip(self.fields, row))))
+            if not row:
+                return None
+            return row[0]
         

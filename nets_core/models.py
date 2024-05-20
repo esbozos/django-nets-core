@@ -86,8 +86,8 @@ class NetsCoreBaseModel(models.Model):
                     if not field.name in self.updated_fields:
                         self.updated_fields[field.name] = []
                     self.updated_fields[field.name].append({
-                        'old': getattr(instance, field.name),
-                        'new': getattr(self, field.name),
+                        'old': str(getattr(instance, field.name)),
+                        'new': str(getattr(self, field.name)),
                         'time': timezone.now().__str__()
                     })
         
