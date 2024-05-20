@@ -104,11 +104,18 @@ class NetsCoreBaseModel(models.Model):
             # read from db the instance and compare the fields
             instance = self.__class__.objects.get(pk=self.pk)            
             # get all fields from instance            
+            if not self.updated_fields:
+                self.updated_fields = {}
             for field in instance._meta.get_fields():
                 if not hasattr(field, 'column'):
                     continue
                 if getattr(instance, field.name) != getattr(self, field.name):
-                    if not field.name in self.updated_fields and not field.name in ['created', 'updated', 'updated_fields']:
+                    not_tracked_fields = ['created', 'updated', 'updated_fields', 'token', 'password']
+                    for f in not_tracked_fields:
+                        if f in field.name:
+                            continue                    
+                        
+                    if not field.name in self.updated_fields and not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
                         self.updated_fields[field.name] = []
                     self.updated_fields[field.name].append({
                         'old': str(getattr(instance, field.name)),
