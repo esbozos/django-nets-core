@@ -95,7 +95,7 @@ class RequestParam():
         self.type = type
         self.optional = optional
         self.validate = validate
-        self.customer = None
+        self.project = None
 
         pass
     
@@ -192,8 +192,8 @@ class RequestParam():
                     f"RP04: {self.errors['invalid_value'].format(self.key)}: {v} no es {self.type} ")
 
         if self.validate:
-            if self.customer:
-                valid = self.validate(v, self.customer)
+            if self.project:
+                valid = self.validate(v, self.project)
             else:
                 valid = self.validate(v)
             if not valid:

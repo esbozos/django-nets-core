@@ -2,15 +2,39 @@ import json
 import logging
 from collections import namedtuple
 
+from django.apps import apps
 from django.http.response import JsonResponse
 
 from nets_core.params import RequestParam
 from nets_core.responses import permission_denied
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-def get_value_from_data_key(data, key, params, customer, files):
+def get_project_from_db(project_id):
+    if not hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
+        raise ValueError(_("NETS_CORE_PROJECT_MODEL not found in settings"))
+    
+    try:
+        model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
+        project = model.objects.get(id=project_id)
+        return project
+    except model.DoesNotExist:
+        return None
+    
+def get_project_membership_from_db(project_id, user):
+    if not hasattr(settings, 'NETS_CORE_PROJECT_MEMBER_MODEL'):
+        raise ValueError(_("NETS_CORE_PROJECT_MEMBER_MODEL not found in settings"))
+    
+    try:
+        model = apps.get_model(settings.NETS_CORE_PROJECT_MEMBER_MODEL)
+        membership = model.objects.get(project_id=project_id, user=user)
+        return membership
+    except model.DoesNotExist:
+        return None
+
+def get_value_from_data_key(data, key, params, project, files):
     # Get value from data calling parse_param
     # to validate type and validate if is required
     # additional add customer to RequestParam instances
@@ -25,10 +49,10 @@ def get_value_from_data_key(data, key, params, customer, files):
     
     param_type = params[key]
     if isinstance(param_type, RequestParam):
-        if customer:
-            # Append customer to parameter to validate
+        if project:
+            # Append project to parameter to validate
             # is required by RequestParam
-            param_type.customer = customer
+            param_type.project = project
         if param_type.type == 'file':
             
             return param_type.get_file(files)
@@ -83,22 +107,26 @@ def request_params_handler(request, params: dict|list={}):
     if request.user.is_anonymous and not request.public:
         return permission_denied()
     # TODO: Add support for multi customer projects
-    customer = None
-    # customer_id = data.get('customer_id', None)
-    # if customer_id:
-    #     customer = get_customer_from_db(data['customer_id'])
-    # if request.customer_required and not customer:
-    #     return JsonResponse({"res": 0, "message": "customer_id is required"}, status=400)
-        
-    # params_keys = params.keys()
-    # request.customer = customer
+    project = None
+    project_membership = None
+    project_id = data.get('project_id', None)
+    if project_id:
+        project = get_project_from_db(data['project_id'])
+        project_membership = get_project_membership_from_db(project_id, request.user)
+    if request.project_required and not project:
+        return JsonResponse({"res": 0, "message": "project_id is required"}, status=400)
+    
+    request.project = project
+    request.project_id = project_id
+    request.project_membership = project_membership
+    
     parsed_data = {}
     # found_params = []
 
     for k in data:
         # parse data from request
         try:
-            parsed_data[k] = get_value_from_data_key(data, k, params, customer, request.FILES)
+            parsed_data[k] = get_value_from_data_key(data, k, params, request.project, request.FILES)
         except Exception as e:
             # Error parsing values
             msg = e.__str__()
@@ -107,7 +135,7 @@ def request_params_handler(request, params: dict|list={}):
     # extract files
     for k in request.FILES:
         if k in params.keys():
-            parsed_data[k] = get_value_from_data_key(data, k, params, customer, request.FILES)
+            parsed_data[k] = get_value_from_data_key(data, k, params, request.project, request.FILES)
 
     if 'action' in parsed_data.keys():
         if not 'paginated_by' in parsed_data.keys():

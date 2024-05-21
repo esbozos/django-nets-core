@@ -64,30 +64,30 @@ def request_handler(
             request.project = None
             request.project_membership = None
             
-            if project_required:
-                if not hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
-                    raise Exception('NETS_CORE_PROJECT_MODEL not set in settings')
-                else:
-                    if not hasattr(request, 'project_id'):
-                        return JsonResponse({"res": 0, "message": _('project_id required')}, status=400)
+            # if project_required:
+            #     if not hasattr(settings, 'NETS_CORE_PROJECT_MODEL'):
+            #         raise Exception('NETS_CORE_PROJECT_MODEL not set in settings')
+            #     else:
+            #         if not hasattr(request, 'project_id'):
+            #             return JsonResponse({"res": 0, "message": _('project_id required')}, status=400)
                     
-                    project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
-                    try:
-                        project = project_model.objects.get(id=request.project_id)
-                        request.project = project
-                    except project_model.DoesNotExist:
-                        return JsonResponse({"res": 0, "message": _('project not found')}, status=404)
+            #         project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
+            #         try:
+            #             project = project_model.objects.get(id=request.project_id)
+            #             request.project = project
+            #         except project_model.DoesNotExist:
+            #             return JsonResponse({"res": 0, "message": _('project not found')}, status=404)
                     
-                if not hasattr(settings, 'NETS_CORE_PROJECT_MEMBER_MODEL'):
-                    raise Exception('NETS_CORE_PROJECT_MEMBER_MODEL not set in settings')
-                else:
-                    project_member_model = apps.get_model(settings.NETS_CORE_PROJECT_MEMBER_MODEL)
-                    try:
-                        project_member = project_member_model.objects.get(user=request.user, project=project)
-                        request.project_membership = project_member
-                    except project_member_model.DoesNotExist:
-                        if perm_required:
-                            return JsonResponse({"res": 0, "message": _('project member not found')}, status=404)
+            #     if not hasattr(settings, 'NETS_CORE_PROJECT_MEMBER_MODEL'):
+            #         raise Exception('NETS_CORE_PROJECT_MEMBER_MODEL not set in settings')
+            #     else:
+            #         project_member_model = apps.get_model(settings.NETS_CORE_PROJECT_MEMBER_MODEL)
+            #         try:
+            #             project_member = project_member_model.objects.get(user=request.user, project=project)
+            #             request.project_membership = project_member
+            #         except project_member_model.DoesNotExist:
+            #             if perm_required:
+            #                 return JsonResponse({"res": 0, "message": _('project member not found')}, status=404)
                         
             
                 
