@@ -311,6 +311,45 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.ERROR("urls.py file not found."))
             pass
+        # check that {project_name}/__init__.py
+        # 
+        # from .celery import app as celery_app
+        # __all__ = ['celery_app']
+        try:
+            init_py = os.path.join(base_dir, f"{project_name}/__init__.py")
+            if not os.path.exists(init_py):
+                self.stdout.write(self.style.ERROR(f"{project_name}/__init__.py not found."))
+                pass
+            else:
+                with open(init_py, "r") as f:
+                    init_content = f.read()
+                    if "from .celery import app as celery_app" in init_content:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "from .celery import app as celery_app found in __init__.py file."
+                            )
+                        )
+                    else:
+                        self.stdout.write(
+                            self.style.ERROR(
+                                "from .celery import app as celery_app not found in __init__.py file."
+                            )
+                        )
+                    if "__all__ = ['celery_app']" in init_content:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "__all__ = ['celery_app'] found in __init__.py file."
+                            )
+                        )
+                    else:
+                        self.stdout.write(
+                            self.style.ERROR(
+                                "__all__ = ['celery_app'] not found in __init__.py file."
+                            )
+                        )
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"{project_name}/__init__.py not found."))
+            pass
 
     def get_project_name(self):
         # get  os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nets_core.settings') from manage.py
@@ -848,6 +887,48 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.NOTICE("asgi.py file already exists."))
 
+        
+        # check __init__.py file
+        init_py = os.path.join(base_dir, f"{project_name}/__init__.py")
+        try:
+            if not os.path.exists(init_py):
+                self.stdout.write(self.style.ERROR(f"{project_name}/__init__.py not found."))
+                sys.exit(1)
+            else:
+                with open(init_py, "r") as f:
+                    init_content = f.read()
+                    if "from .celery import app as celery_app" in init_content:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "from .celery import app as celery_app found in __init__.py file."
+                            )
+                        )
+                    else:
+                        self.stdout.write(
+                            self.style.NOTICE(
+                                "Adding from .celery import app as celery_app to __init__.py file."
+                            )
+                        )
+                        init_content = f"from .celery import app as celery_app\n{init_content}"
+                    if "__all__ = ['celery_app']" in init_content:
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                "__all__ = ['celery_app'] found in __init__.py file."
+                            )
+                        )
+                    else:
+                        self.stdout.write(
+                            self.style.NOTICE(
+                                "__all__ = ['celery_app'] not found in __init__.py file."
+                            )
+                        )
+                        init_content = f"__all__ = ['celery_app']\n{init_content}"
+                    with open(init_py, "w") as f:
+                        f.write(init_content)
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"{project_name}/__init__.py not found."))
+            pass
+        
         # create settings_[ENV].py file
 
         settings_env_py = os.path.join(base_dir, f"{project_name}/settings_nets.py")
