@@ -1,6 +1,7 @@
 import calendar
 import time
 import uuid
+import re
 from datetime import date, datetime
 from django.apps import apps
 from django.utils import timezone
@@ -53,8 +54,9 @@ def generate_int_uuid(size=None):
 
 def get_upload_path(instance, filename):
     folder = instance._meta.model_name
-    if instance and hasattr(instance, 'customer'):
-        path = '{}/'.format(instance.customer.shortname)
+    path = ''
+    if instance and hasattr(instance, 'project'):        
+        path = f'PSMDOC_PROJ_{instance.project.id}/'                
     
     path += '{}'.format(folder) if folder.endswith('/') else '{}/'.format(folder)
 
