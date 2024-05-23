@@ -115,13 +115,14 @@ class NetsCoreBaseModel(models.Model):
                         if f in field.name:
                             continue                    
                         
-                    if not field.name in self.updated_fields and not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
-                        self.updated_fields[field.name] = []
-                    self.updated_fields[field.name].append({
-                        'old': str(getattr(instance, field.name)),
-                        'new': str(getattr(self, field.name)),
-                        'time': timezone.now().__str__()
-                    })
+                    if not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
+                        if not field.name in self.updated_fields:
+                            self.updated_fields[field.name] = []
+                        self.updated_fields[field.name].append({
+                            'old': str(getattr(instance, field.name)),
+                            'new': str(getattr(self, field.name)),
+                            'time': timezone.now().__str__()
+                        })
         
         else:
             self.updated_fields = {}        
