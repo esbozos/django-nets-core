@@ -3,8 +3,11 @@ import time
 import uuid
 import re
 from datetime import date, datetime
+
+from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 from django.utils import timezone
+
 import pytz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
@@ -66,13 +69,25 @@ def get_upload_path(instance, filename):
     path = '{}{}'.format(path, filename)
     return path
 
+
 def check_perm(user, action, project=None):
     from nets_core.models import Permission
-    
+    project_content_type = None
+    project_id = None
     if user.is_superuser:
         return True
     
     if project:
+        project_content_type = ContentType.objects.get_for_model(project)
+        project_id = project.id
+    
+    if not Permission.objects.filter(codename=action, project_content_type=project_content_type, project_id=project_id).exists():
+        # create permission and return False because this permission does not exist
+        permission = Permission.objects.create(codename=action, project_content_type=project_content_type, project_id=project_id)
+        return False
+    
+    if project:
+        
         try:
             project_member_model = apps.get_model(settings.NETS_CORE_PROJECT_MEMBER_MODEL)
             try:
@@ -86,17 +101,29 @@ def check_perm(user, action, project=None):
         except:
             raise Exception('check_perm failed NETS_CORE_PROJECT_MEMBER_MODEL not set in settings')
         
-    if not Permission.objects.filter(codename=action, project=project).exists():
-        permission = Permission.objects.create(codename=action, project=project)
-        return False
-    permisions = Permission.objects.filter(
+        roles = member.user.roles.filter(project_content_type=project_content_type, project_id=project_id)
+        
+        if roles.exists():
+            permisions = Permission.objects.filter(
+                roles__in=roles, 
+                codename=action.lower(),
+                project_content_type=project_content_type,
+                project_id=project_id
+            ).exists()
+        else:
+            permisions = False
+            
+    else:
+        permisions = Permission.objects.filter(
             roles__user=user, 
-            roles__project=project,
-            roles__enabled=True,
-            project=project, 
-            codename=action.lower(), 
+            roles__project_content_type=project_content_type,
+            roles__enabled=True,            
+            codename=action.lower(),
+            project_content_type=project_content_type,
+            project_id=project_id
         ).exists()
     
     if permisions:
         return True
     return False
+    

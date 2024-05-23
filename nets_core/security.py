@@ -1,9 +1,14 @@
+from django.apps import apps
 from django.conf import settings
-from nets_core.models import VerificationCode
-from oauthlib import common
-from oauth2_provider.models import Application, AccessToken, RefreshToken
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
+
+from oauthlib import common
+from oauth2_provider.models import Application, AccessToken, RefreshToken
+
+from nets_core.models import Permission, Role, VerificationCode
+
 
 # TODO: create middleware to restring token_access with device_uuid
 
@@ -93,3 +98,51 @@ def authenticate(user, code: str, client_id: str, client_secret: str, device_uui
         "refresh_token": refresh_token.token,
         "token_expire": access_token.expires
     }
+
+
+def get_or_create_project_role(project, role_name):
+    """
+        Create a role for project to provide multi project support
+        Parameters:        
+        project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
+        role_name (str): Role name
+
+        Returns:
+        instance: nets_core.models.Role
+
+    """
+    try:
+        project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
+        if not isinstance(project, project_model):
+            raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
+        
+        
+    except project_model.DoesNotExist:
+        raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
+    
+    content_type = ContentType.objects.get_for_model(project)
+    role_name = f'{role_name}_{project.id}'
+    role, _role_created = Role.objects.get_or_create(name=role_name, project_content_type=content_type, project_id=project.id)
+    
+    return role
+
+def get_or_create_project_role_permission(project, role_name, codename, verbose_name: str=None, description: str=""):
+    """
+        Create a role for project to provide multi project support
+        Parameters:        
+        project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
+        role_name (str): Role name
+        codename (str): Permission codename
+
+        Returns:
+        instance: nets_core.models.Role
+
+    """
+    role = get_or_create_project_role(project, role_name)
+    content_type = ContentType.objects.get_for_model(project)
+    if not verbose_name:
+        verbose_name = codename.replace('_', ' ').capitalize()
+    permission, _permission_created = Permission.objects.get_or_create(codename=codename, project_content_type=content_type, project_id=project.id, defaults={'name': verbose_name, 'description': description})
+    
+    role.permissions.add(permission)
+    return permission
