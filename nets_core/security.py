@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from oauthlib import common
 from oauth2_provider.models import Application, AccessToken, RefreshToken
 
-from nets_core.models import Permission, Role, VerificationCode
+from nets_core.models import Permission, Role, UserRole, VerificationCode
 
 
 # TODO: create middleware to restring token_access with device_uuid
@@ -124,7 +124,7 @@ def get_or_create_project_role(project, role_name):
     role_name = f'{role_name}_{project.id}'
     role, _role_created = Role.objects.get_or_create(name=role_name, project_content_type=content_type, project_id=project.id)
     
-    return role
+    return role, _role_created
 
 def get_or_create_project_role_permission(project, role_name, codename, verbose_name: str=None, description: str=""):
     """
@@ -138,11 +138,39 @@ def get_or_create_project_role_permission(project, role_name, codename, verbose_
         instance: nets_core.models.Role
 
     """
-    role = get_or_create_project_role(project, role_name)
+    role, _role_created = get_or_create_project_role(project, role_name)
     content_type = ContentType.objects.get_for_model(project)
     if not verbose_name:
         verbose_name = codename.replace('_', ' ').capitalize()
     permission, _permission_created = Permission.objects.get_or_create(codename=codename, project_content_type=content_type, project_id=project.id, defaults={'name': verbose_name, 'description': description})
     
     role.permissions.add(permission)
-    return permission
+    return permission, _permission_created
+
+def add_user_to_role(user, project, role_name):
+    """
+        Add role to user in project
+        Parameters:        
+        user (instance): User instance. Should be the same as settings.AUTH_USER_MODEL
+        project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
+        role_name (str): Role name
+
+        Returns:
+        instance: nets_core.models.Role
+
+    """
+    try:
+        project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
+        if not isinstance(project, project_model):
+            raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
+        
+        user_model = apps.get_model(settings.AUTH_USER_MODEL)
+        if not isinstance(user, user_model):
+            raise Exception(_("Invalid user instance. Should be the same as settings.AUTH_USER_MODEL"))
+        
+    except project_model.DoesNotExist:
+        raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
+    
+    role, _role_created = get_or_create_project_role(project, role_name)
+    user_role, _user_role_created = UserRole.objects.get_or_create(user=user, role=role)
+    return  user_role, _user_role_created

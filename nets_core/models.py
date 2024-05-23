@@ -216,6 +216,12 @@ class UserRole(NetsCoreBaseModel):
             return f'{self.user} - {self.role} - {self.project}'
         return f'{self.user} - {self.role}'    
     
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'project') and self.project:
+            self.project_content_type = ContentType.objects.get_for_model(self.project)
+            self.project_id = self.project.id
+            
+        super(UserRole, self).save(*args, **kwargs)
 
 
 class VerificationCode(OwnedModel):
