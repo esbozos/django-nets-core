@@ -121,7 +121,8 @@ def get_or_create_project_role(project, role_name):
         raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
     
     content_type = ContentType.objects.get_for_model(project)
-    role_name = f'{role_name}_{project.id}'
+    if not role_name.endswith(f'_{project.id}'):
+        role_name = f'{role_name}_{project.id}'
     role, _role_created = Role.objects.get_or_create(name=role_name, project_content_type=content_type, project_id=project.id)
     
     return role, _role_created
@@ -172,5 +173,7 @@ def add_user_to_role(user, project, role_name):
         raise Exception(_("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"))
     
     role, _role_created = get_or_create_project_role(project, role_name)
-    user_role, _user_role_created = UserRole.objects.get_or_create(user=user, role=role)
+    project_content_type = ContentType.objects.get_for_model(project)
+    user_role, _user_role_created = UserRole.objects.get_or_create(user=user, role=role, project_content_type=project_content_type, project_id=project.id)
+    
     return  user_role, _user_role_created

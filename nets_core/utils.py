@@ -101,29 +101,34 @@ def check_perm(user, action, project=None):
         except:
             raise Exception('check_perm failed NETS_CORE_PROJECT_MEMBER_MODEL not set in settings')
         
-        roles = member.user.roles.filter(project_content_type=project_content_type, project_id=project_id)
+        user_roles = member.user.roles.filter(project_content_type=project_content_type, project_id=project_id)
+        # user_perms = []
+        # for r in user_roles:
+        #     user_perms += r.role.permissions.all()
+        # print(f'User: {user}', user_roles, user_perms   )
         
-        if roles.exists():
-            permisions = Permission.objects.filter(
+        
+        # print(f'Roles: {user_roles}', project_content_type, project_id)
+        
+        print(action)
+        if user_roles.exists():
+            roles = [u.role for u in user_roles]
+            return Permission.objects.filter(
                 roles__in=roles, 
-                codename=action.lower(),
-                project_content_type=project_content_type,
-                project_id=project_id
+                codename=action.lower(),                
             ).exists()
         else:
-            permisions = False
+            return False
             
     else:
-        permisions = Permission.objects.filter(
-            roles__user=user, 
-            roles__project_content_type=project_content_type,
-            roles__enabled=True,            
-            codename=action.lower(),
-            project_content_type=project_content_type,
-            project_id=project_id
-        ).exists()
-    
-    if permisions:
-        return True
-    return False
-    
+        user_roles = user.roles.filter(role__enabled=True)
+        user_perms = []
+        for r in user_roles:
+            user_perms += r.role.permissions.all()
+        print(f'User: {user}', user_roles, user_perms   )
+        for p in user_perms:
+            print(p.codename)
+            if p.codename == action:
+                return True
+            
+        return False

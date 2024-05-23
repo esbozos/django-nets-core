@@ -203,7 +203,8 @@ def auth(request):
         user.last_login = timezone.now()
         user.save()
         tokens.update({"user": user.to_json()})
-
+        # add user to session
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return success_response(tokens)
 
     except Exception as e:
