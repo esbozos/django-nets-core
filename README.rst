@@ -1,3 +1,11 @@
+TODO: DOCUMENTATION PENDING
+===========================
+
+- [ ] Add documentation in PSMDOC format
+- [ ] Add examples of send email, PUSH NOTIFICATIONS, SMS, etc
+- [ ] Add examples of create roles and permissions in multi project support
+- [ ] Add examples of request_handler usage to validate permissions, ownership, etc
+
 =========
 NETS CORE
 =========
@@ -19,7 +27,7 @@ This package requires the following packages that will be installed automaticall
     django-cors-headers
     celery
     django-celery-beat
-    djando-cors-headers
+    django-cors-headers
     django-memcached
     python-memcached
     pymemcache

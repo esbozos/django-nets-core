@@ -87,7 +87,8 @@ class Command(BaseCommand):
         "CORS_ALLOW_METHODS",
         "CORS_ORIGIN_ALLOW_ALL",
         "CORS_EXPOSE_HEADERS",
-        "CORS_ALLOW_CREDENTIALS"
+        "CORS_ALLOW_CREDENTIALS",
+        "ALLOWED_HOSTS",
     ]
 
     def add_arguments(self, parser):
@@ -288,6 +289,19 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR("CORS and/or csrf settings not found in settings.py file.")
+            )
+            pass
+        
+        # check if SITE_DOMAIN is in ALLOWED_HOSTS
+        try:
+            allowed_hosts = settings.ALLOWED_HOSTS
+            if site_domain not in allowed_hosts:
+                self.stdout.write(
+                    self.style.ERROR(f"{site_domain} not found in ALLOWED_HOSTS in settings.py file.")
+                )
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR("ALLOWED_HOSTS not found in settings.py file.")
             )
             pass
 
@@ -761,6 +775,15 @@ class Command(BaseCommand):
                 f"http://localhost:3000",
                 f"https://localhost:8000",
             ]
+            
+        # check if SITE_DOMAIN is in ALLOWED_HOSTS
+        if not hasattr(settings, "ALLOWED_HOSTS"):
+            self.stdout.write(
+                self.style.NOTICE("Adding ALLOWED_HOSTS to settings.py file.")
+            )
+            # append SITE_DOMAIN to ALLOWED_HOSTS
+            settings.ALLOWED_HOSTS = [settings.SITE_DOMAIN]
+            
 
         
         # check for urls.py file

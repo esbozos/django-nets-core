@@ -61,6 +61,7 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
     # Exclude emails from exclude_domain
     if(isinstance(email, str)):
         email_domain = email.split('@')
+        email = [email]
         if email_domain in exclude_domains:
             return (False, f'{_("Email domain is in NETS_CORE_EMAIL_EXCLUDE_DOMAINS ")} {email_domain}')
 
@@ -118,16 +119,20 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
         return (True, _("Email in queue."))
 
     else:
-        msg = EmailMultiAlternatives(**params)
-        msg = EmailMultiAlternatives(
-            subject, content_html, settings.DEFAULT_FROM_EMAIL, email)
-        msg.content_subtype = "html"
-        if content_txt:
-            msg.attach_alternative(content_txt, "text/plain")
-        result = msg.send(fail_silently=False)
-        if result:
-            return (True, _("Email sent"))
-        else:
+        try:
+            msg = EmailMultiAlternatives(**params)
+            msg = EmailMultiAlternatives(
+                subject, content_html, settings.DEFAULT_FROM_EMAIL, email)
+            msg.content_subtype = "html"
+            if content_txt:
+                msg.attach_alternative(content_txt, "text/plain")
+            result = msg.send(fail_silently=False)
+            if result:
+                return (True, _("Email sent"))
+            else:
+                return (False, _("Email wasn't sent"))
+        except Exception as e:
+            print(e)
             return (False, _("Email wasn't sent"))
     # if sms:
     #     sms.send_sms(phone, text)
