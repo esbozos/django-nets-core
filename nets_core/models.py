@@ -99,33 +99,34 @@ class NetsCoreBaseModel(models.Model):
         return NetsCoreModelToJson(self, fields).to_json()
     
     def save(self, *args, **kwargs):
-        # implements updated fields to be updated
-        if hasattr(self, 'updated_fields') and self.pk:
-            # read from db the instance and compare the fields
-            instance = self.__class__.objects.get(pk=self.pk)            
-            # get all fields from instance            
-            if not self.updated_fields:
-                self.updated_fields = {}
-            for field in instance._meta.get_fields():
-                if not hasattr(field, 'column'):
-                    continue
-                if getattr(instance, field.name) != getattr(self, field.name):
-                    not_tracked_fields = ['created', 'updated', 'updated_fields', 'token', 'password']
-                    for f in not_tracked_fields:
-                        if f in field.name:
-                            continue                    
+        # # implements updated fields to be updated
+        # if hasattr(self, 'updated_fields') and self.pk:
+        #     # read from db the instance and compare the fields
+        #     instance = self.__class__.objects.get(pk=self.pk)            
+        #     # get all fields from instance            
+        #     if not self.updated_fields:
+        #         self.updated_fields = {}
+        #     # only check fields that are not foreign keys
+        #     for field in self._meta.get_fields():
+        #         if not hasattr(field, 'column'):
+        #             continue
+        #         if getattr(instance, field.name) != getattr(self, field.name):
+        #             not_tracked_fields = ['created', 'updated', 'updated_fields', 'token', 'password']
+        #             for f in not_tracked_fields:
+        #                 if f in field.name:
+        #                     continue                    
                         
-                    if not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
-                        if not field.name in self.updated_fields:
-                            self.updated_fields[field.name] = []
-                        self.updated_fields[field.name].append({
-                            'old': str(getattr(instance, field.name)),
-                            'new': str(getattr(self, field.name)),
-                            'time': timezone.now().__str__()
-                        })
+        #             if not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
+        #                 if not field.name in self.updated_fields:
+        #                     self.updated_fields[field.name] = []
+        #                 self.updated_fields[field.name].append({
+        #                     'old': str(getattr(instance, field.name)),
+        #                     'new': str(getattr(self, field.name)),
+        #                     'time': timezone.now().__str__()
+        #                 })
         
-        else:
-            self.updated_fields = {}        
+        # else:
+        #     self.updated_fields = {}        
                 
         super(NetsCoreBaseModel, self).save(*args, **kwargs)
 

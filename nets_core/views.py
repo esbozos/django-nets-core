@@ -237,14 +237,15 @@ def auth_logout(request):
 
 @request_handler(
     params=[
-        RequestParam("fields", list)
+        RequestParam("fields", list, True, default=None),
     ]
 )
 def auth_get_profile(request):
     request.user.save()
     fields = request.params.fields 
     # convert list in tuple
-    fields = tuple(fields)   
+    if fields:
+        fields = tuple(fields)   
         
     return success_response(request.user.to_json(fields=fields))
 
