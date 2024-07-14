@@ -447,27 +447,28 @@ DJANGO SETTINGS
     # firebase credentials
     FIREBASE_CONFIG = os.path.join(BASE_DIR, 'firebase-credentials.json')
 
+
 Dependencies
-____________
+============
     Django
-    pytz 
+    pytz
     python-dateutil
-    shortuuid 
-    django-oauth-toolkit 
-    firebase-admin 
+    shortuuid
+    django-oauth-toolkit
+    firebase-admin
     django-cors-headers
 
 
 
 Authentication is made with:
-____________________________
+============================
     django-oauth-toolkit
     django-cors-headers
 
 
 
 Authentication
-______________
+==============
 
     from nets_core.security import authenticate
     authenticate(user, code, client_id, client_secret)
