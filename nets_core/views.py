@@ -183,7 +183,7 @@ def check_email(request):
 def auth(request):
     user = request.obj
     device_uuid = None
-    if hasattr(request.params, "device_uuid"):
+    if hasattr(request.params, "device_uuid") and request.params.device_uuid:
         try:
             device = UserDevice.objects.get(uuid=request.params.device_uuid, user=user)
             device_uuid = device.uuid
@@ -242,11 +242,11 @@ def auth_logout(request):
 )
 def auth_get_profile(request):
     request.user.save()
-    fields = request.params.fields 
+    fields = request.params.fields
     # convert list in tuple
     if fields:
-        fields = tuple(fields)   
-        
+        fields = tuple(fields)
+
     return success_response(request.user.to_json(fields=fields))
 
 

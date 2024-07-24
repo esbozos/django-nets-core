@@ -73,6 +73,37 @@ class NetsCoreBaseModel(models.Model):
     class Meta:
         abstract = True
         
+    def validate_fields(self, fields: tuple):
+        schema = self._meta.get_fields()
+        final_fields =  tuple()
+        for f in schema:
+            if f.name in fields:
+                if isinstance(f, models.ForeignKey):
+                    related_model = f.related_model
+                    print(f.name, related_model)
+                    if hasattr(related_model, "JSON_DATA_FIELDS") and related_model.JSON_DATA_FIELDS:
+                        if not isinstance(related_model.JSON_DATA_FIELDS, tuple):
+                            try:
+                                related_fields = tuple(related_model.JSON_DATA_FIELDS)
+                            except Exception as e:
+                                raise ValueError(_("Fields must be a tuple or list"))
+                        else:
+                            related_fields = fields
+                        # get the related model instance
+                        instance = getattr(self, f.name)
+                        # check if instance is not None
+                        if instance:
+                            # get the JSON_DATA_FIELDS from the related model
+                            from nets_core.serializers import NetsCoreModelToJson
+                            r_query = NetsCoreModelToJson(instance, related_fields).to_json(returning_query=True)
+                            final_fields = final_fields + (f"({r_query}) AS {f.name}",)
+                    else:
+                        raise ValueError(_("Field %s is a related model but has no JSON_DATA_FIELDS" % f.name))
+                else:
+                    final_fields = final_fields + (f.name,)
+        return final_fields
+
+        
     def to_json(self, fields: tuple = None):
         # check if JSON_DATA_FIELDS is present
         if hasattr(self, "JSON_DATA_FIELDS") and not fields:
@@ -87,11 +118,35 @@ class NetsCoreBaseModel(models.Model):
         if not fields:
             raise ValueError(_("Fields must be provided"))
         if fields == '__all__':
-            # get fiels to tupple but names from columns in db table schema, user should be user_id
+            # get fields to tuple but names from columns in db table schema, user should be user_id
             schema = self._meta.get_fields()
             fields = tuple([field.column for field in schema if hasattr(field, 'column')])
-            
-        
+            related_fields = [field.name for field in schema if hasattr(field, 'related_model')]
+            fields = self.validate_fields(fields + tuple(related_fields))
+            # for ForeignKeys and related models, using to_json method
+            # for field in schema:
+            #     if hasattr(field, 'related_model') and field.related_model:
+            #         # get the related model
+            #         related_model = field.related_model
+            #         # get the related model JSON_DATA_FIELDS if present
+            #         if hasattr(related_model, "JSON_DATA_FIELDS") and related_model.JSON_DATA_FIELDS:
+            #             if not isinstance(related_model.JSON_DATA_FIELDS, tuple):
+            #                 try:
+            #                     related_fields = tuple(related_model.JSON_DATA_FIELDS)
+            #                 except Exception as e:
+            #                     raise ValueError(_("Fields must be a tuple or list"))
+            #             else:
+            #                 related_fields = fields
+            #             # get the related model instance
+            #             instance = getattr(self, field.name)
+            #             # check if instance is not None
+            #             if instance:
+            #                 # get the JSON_DATA_FIELDS from the related model
+            #                 from nets_core.serializers import NetsCoreModelToJson
+            #                 r_query = NetsCoreModelToJson(instance, related_fields).to_json(returning_query=True)
+            #                 fields = fields + (f"({r_query}) AS {field.name}",)
+        else:
+            fields = self.validate_fields(fields)
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))
         

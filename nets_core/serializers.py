@@ -129,9 +129,12 @@ class NetsCoreModelToJson():
         self.fields = ", ".join(fields)
         self.using = using
         
-    def to_json(self):
+    def to_json(self, returning_query: bool = False):
         with connections[self.using].cursor() as cursor:
-            cursor.execute(f"SELECT nets_core_postgre_model_to_json('{self.instance._meta.db_table}', '{self.fields}', {self.instance.pk})")
+            t_query = f"SELECT nets_core_postgre_model_to_json('{self.instance._meta.db_table}', '{self.fields}', {self.instance.pk})"
+            if returning_query:
+                return t_query
+            cursor.execute(t_query)
             row = cursor.fetchone()
             if not row:
                 return None

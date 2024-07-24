@@ -203,7 +203,8 @@ example of models:
         project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)        
         is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)    
-        role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')
+        role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')        
+        JSON_DATA_FIELDS = ['id', 'is_superuser', 'role', 'user'] # User is a ForeignKey to user model, foreign models to include in json data should extend OwnedModel or NetsCoreBaseModel and include JSON_DATA_FIELDS is required
 
         PROTECTED_FIELDS = ['is_superuser', 'project']
         
