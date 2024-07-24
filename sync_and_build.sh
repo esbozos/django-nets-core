@@ -28,6 +28,6 @@ version=$(echo $version | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
 sed -i "s/version = .*/version = $version/" setup.cfg
 
 # build the project
-python3 setup.py sdist 
+python3 setup.py sdist  && twine upload --config=.pypirc dist/django_nets_core-$version.tar.gz
 
 

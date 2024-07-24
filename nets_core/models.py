@@ -1,3 +1,6 @@
+import json
+import shortuuid
+
 from uuid import uuid4
 
 
@@ -72,9 +75,10 @@ class NetsCoreBaseModel(models.Model):
         
     def validate_fields(self, fields: tuple):
         schema = self._meta.get_fields()
-        final_fields =  tuple()
+        # add fields that are not in schema and end with _id as user should be user_id and not present in schema
+        final_fields =  [f for f in fields if f.endswith('_id')]
         for f in schema:
-            if f.name in fields:
+            if f.name in fields and not f.name in final_fields:
                 if isinstance(f, models.ForeignKey):
                     related_model = f.related_model
                     print(f.name, related_model)
@@ -89,14 +93,17 @@ class NetsCoreBaseModel(models.Model):
                         # replace field for related format as field_name:[table_name; ...related_fields]
                         table_name = related_model._meta.db_table
                         related_fields = [table_name] + list(related_fields)
-                        final_fields = final_fields + (f"{f.name}:[{';'.join(related_fields)}]",)
+                        final_fields.append(f"{f.name}_id:[{';'.join(related_fields)}]")
+                        # final_fields = final_fields + (f"{f.name}:[{';'.join(related_fields)}]",)
                         
                         
                     else:
                         raise ValueError(_("Field %s is a related model but has no JSON_DATA_FIELDS" % f.name))
                 else:
-                    final_fields = final_fields + (f.name,)
-        return final_fields
+                    final_fields.append(f.name)
+        
+        
+        return tuple(final_fields)
 
         
     def to_json(self, fields: tuple = None):
@@ -117,67 +124,18 @@ class NetsCoreBaseModel(models.Model):
             schema = self._meta.get_fields()
             fields = tuple([field.column for field in schema if hasattr(field, 'column')])
             related_fields = [field.name for field in schema if hasattr(field, 'related_model')]
-            fields = self.validate_fields(fields + tuple(related_fields))
-            # for ForeignKeys and related models, using to_json method
-            # for field in schema:
-            #     if hasattr(field, 'related_model') and field.related_model:
-            #         # get the related model
-            #         related_model = field.related_model
-            #         # get the related model JSON_DATA_FIELDS if present
-            #         if hasattr(related_model, "JSON_DATA_FIELDS") and related_model.JSON_DATA_FIELDS:
-            #             if not isinstance(related_model.JSON_DATA_FIELDS, tuple):
-            #                 try:
-            #                     related_fields = tuple(related_model.JSON_DATA_FIELDS)
-            #                 except Exception as e:
-            #                     raise ValueError(_("Fields must be a tuple or list"))
-            #             else:
-            #                 related_fields = fields
-            #             # get the related model instance
-            #             instance = getattr(self, field.name)
-            #             # check if instance is not None
-            #             if instance:
-            #                 # get the JSON_DATA_FIELDS from the related model
-            #                 from nets_core.serializers import NetsCoreModelToJson
-            #                 r_query = NetsCoreModelToJson(instance, related_fields).to_json(returning_query=True)
-            #                 fields = fields + (f"({r_query}) AS {field.name}",)
+            fields = self.validate_fields(fields + tuple(related_fields))            
         else:
             fields = self.validate_fields(fields)
         if not isinstance(fields, tuple):
             raise ValueError(_("Fields must be a tuple"))
         
         from nets_core.serializers import NetsCoreModelToJson
+        print(f"PASSED FIELDS: {fields}")
         return NetsCoreModelToJson(self, fields).to_json()
     
     def save(self, *args, **kwargs):
-        # # implements updated fields to be updated
-        # if hasattr(self, 'updated_fields') and self.pk:
-        #     # read from db the instance and compare the fields
-        #     instance = self.__class__.objects.get(pk=self.pk)            
-        #     # get all fields from instance            
-        #     if not self.updated_fields:
-        #         self.updated_fields = {}
-        #     # only check fields that are not foreign keys
-        #     for field in self._meta.get_fields():
-        #         if not hasattr(field, 'column'):
-        #             continue
-        #         if getattr(instance, field.name) != getattr(self, field.name):
-        #             not_tracked_fields = ['created', 'updated', 'updated_fields', 'token', 'password']
-        #             for f in not_tracked_fields:
-        #                 if f in field.name:
-        #                     continue                    
                         
-        #             if not field.name in ['created', 'updated', 'updated_fields', 'token', 'password']:
-        #                 if not field.name in self.updated_fields:
-        #                     self.updated_fields[field.name] = []
-        #                 self.updated_fields[field.name].append({
-        #                     'old': str(getattr(instance, field.name)),
-        #                     'new': str(getattr(self, field.name)),
-        #                     'time': timezone.now().__str__()
-        #                 })
-        
-        # else:
-        #     self.updated_fields = {}        
-                
         super(NetsCoreBaseModel, self).save(*args, **kwargs)
 
 

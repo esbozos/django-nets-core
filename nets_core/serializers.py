@@ -126,7 +126,7 @@ class NetsCoreModelToJson():
                     if field.lower() in f.lower():
                         fields = fields[:i] + fields[i+1:]
 
-        self.fields = ", ".join(fields)
+        self.fields = ",".join(fields)
         self.using = using
         
     def to_json(self, returning_query: bool = False):
