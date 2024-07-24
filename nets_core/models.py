@@ -1,6 +1,3 @@
-import json
-import shortuuid
-
 from uuid import uuid4
 
 
@@ -89,14 +86,12 @@ class NetsCoreBaseModel(models.Model):
                                 raise ValueError(_("Fields must be a tuple or list"))
                         else:
                             related_fields = fields
-                        # get the related model instance
-                        instance = getattr(self, f.name)
-                        # check if instance is not None
-                        if instance:
-                            # get the JSON_DATA_FIELDS from the related model
-                            from nets_core.serializers import NetsCoreModelToJson
-                            r_query = NetsCoreModelToJson(instance, related_fields).to_json(returning_query=True)
-                            final_fields = final_fields + (f"({r_query}) AS {f.name}",)
+                        # replace field for related format as field_name:[table_name; ...related_fields]
+                        table_name = related_model._meta.db_table
+                        related_fields = [table_name] + list(related_fields)
+                        final_fields = final_fields + (f"{f.name}:[{';'.join(related_fields)}]",)
+                        
+                        
                     else:
                         raise ValueError(_("Field %s is a related model but has no JSON_DATA_FIELDS" % f.name))
                 else:
