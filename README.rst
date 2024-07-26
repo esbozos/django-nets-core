@@ -118,6 +118,8 @@ _____
             RequestParam('name', str, optional=False),
         ],
         public=False, # default is False
+        # if ProjectMemberModel has role field can_do can be use with role names
+        # can_do='role:admin' will check if user has role admin in project or is owner of object
         can_do='myapp.can_delete_object', # this will be check permission to do action, if not passed, only owner of object can do action, if permission does not exists will be created
         perm_required=False, # default is False, this will check if user has permission to do action or is owner of object, if set to TRUE only acces will be granted if can_do is passed
 
@@ -203,7 +205,7 @@ example of models:
         project = models.ForeignKey(MyProjectModel, on_delete=models.CASCADE)        
         is_superuser = models.BooleanField(default=False)
         enabled = models.BooleanField(default=True)    
-        role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')        
+        role = models.CharField(max_length=255, choices=MEMBER_ROLES, default='member')  # OPTIONAL but recommended to use in access control by roles see can_do param in request_handler
         JSON_DATA_FIELDS = ['id', 'is_superuser', 'role', 'user'] # User is a ForeignKey to user model, foreign models to include in json data should extend OwnedModel or NetsCoreBaseModel and include JSON_DATA_FIELDS is required
 
         PROTECTED_FIELDS = ['is_superuser', 'project']

@@ -73,7 +73,7 @@ def get_upload_path(instance, filename):
 
 
 def check_perm(user, action, project=None):
-    from nets_core.models import Permission
+    from nets_core.models import Permission, RolePermission
 
     project_content_type = None
     project_id = None
@@ -103,6 +103,11 @@ def check_perm(user, action, project=None):
                     return False
                 if hasattr(member, "is_superuser") and member.is_superuser:
                     return True
+                
+                if hasattr(member, 'role'):
+                    if action.startswith('role:'):
+                        return member.role.name.lower() == action.split(':')[1].lower()
+                
             except project_member_model.DoesNotExist:
                 return False
         except:
@@ -113,19 +118,13 @@ def check_perm(user, action, project=None):
         user_roles = member.user.roles.filter(
             project_content_type=project_content_type, project_id=project_id
         )
-        # user_perms = []
-        # for r in user_roles:
-        #     user_perms += r.role.permissions.all()
-        # print(f'User: {user}', user_roles, user_perms   )
-
-        # print(f'Roles: {user_roles}', project_content_type, project_id)
-
-        print(action)
-        if user_roles.exists():
+        
+        
+        if user_roles.exists():            
             roles = [u.role for u in user_roles]
-            return Permission.objects.filter(
-                roles__in=roles,
-                codename=action.lower(),
+            return RolePermission.objects.filter(
+                role__in=roles,
+                permission__codename=action.lower(),
             ).exists()
         else:
             return False
