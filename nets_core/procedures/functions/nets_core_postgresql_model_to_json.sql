@@ -48,12 +48,11 @@ BEGIN
     IF POSITION(':' IN _fields) > 0 THEN
         -- extract nested model and fields
         -- split fields by comma
-        _array_fields := string_to_array(_fields, ',');
-        RAISE NOTICE 'Array fields: %', _array_fields;
+        _array_fields := string_to_array(_fields, ',');        
         FOREACH _nested_field_origin IN ARRAY _array_fields
         LOOP
             IF POSITION(':' IN _nested_field_origin) = 0 THEN
-                RAISE NOTICE 'Nested field not found in % %', _nested_field_origin, POSITION(':' IN _nested_field_origin);
+                
                 CONTINUE;
             END IF;
             -- split field by colon
@@ -74,7 +73,7 @@ BEGIN
                                 );
             _nested_queries := array_append(_nested_queries, _nested_query);
             _fields = REPLACE(_fields, _nested_field_origin, '');
-            RAISE NOTICE 'fields: %', _fields;
+            
         END LOOP;
     END IF;
 

@@ -143,7 +143,10 @@ def get_or_create_project_role_permission(project, role_name, codename, verbose_
     content_type = ContentType.objects.get_for_model(project)
     if not verbose_name:
         verbose_name = codename.replace('_', ' ').capitalize()
-    permission, _permission_created = Permission.objects.get_or_create(codename=codename, project_content_type=content_type, project_id=project.id, defaults={'name': verbose_name, 'description': description})
+    permission, _permission_created = Permission.objects.get_or_create(
+        codename=codename,
+        defaults={'name': verbose_name, 'description': description}
+    )
     
     role.permissions.add(permission)
     return permission, _permission_created

@@ -1,7 +1,11 @@
 from django.contrib import admin
 from nets_core import models
 
+# RolePermissionInline = admin.TabularInline
 
+class RolePermissionInline(admin.TabularInline):
+    model = models.Role.permissions.through
+    extra = 1
 
 
 @admin.register(models.Role)
@@ -11,15 +15,14 @@ class RoleAdmin(admin.ModelAdmin):
     list_display = ('name', 'description', 'project', 'enabled')
     list_filter = ('project', 'enabled')
     search_fields = ('name', 'description', 'project')
+    inlines = [RolePermissionInline]
         
     
 @admin.register(models.Permission)
 class PermissionAdmin(admin.ModelAdmin):
-    model = models.Permission
-    
-    list_display = ('codename', 'description', 'project')
-    list_filter = ('project',)
-    search_fields = ('codename', 'description', 'project')
+    model = models.Permission    
+    list_display = ('codename', 'description')    
+    search_fields = ('codename', 'description')
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
