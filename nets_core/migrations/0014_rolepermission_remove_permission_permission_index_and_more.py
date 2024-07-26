@@ -22,7 +22,9 @@ def pre_migration(apps, schema_editor):
                         r.save()
                 # delete other permissions
                 other_permissions.delete()
-                
+        else:
+            p.delete()
+
 def migrate_through(apps, schema_editor):
     Role = apps.get_model("nets_core", "Role")
     Permission = apps.get_model("nets_core", "Permission")
