@@ -175,6 +175,7 @@ class Permission(NetsCoreBaseModel):
     # project_id = models.PositiveIntegerField(null=True, blank=True)
     # project = GenericForeignKey("project_content_type", "project_id")
 
+    JSON_DATA_FIELDS = ["name", "codename", "description"]
     objects = NetsCoreBaseManager()
 
     class Meta:
@@ -197,13 +198,23 @@ class Role(NetsCoreBaseModel):
     name = models.CharField(_("Name"), max_length=150)
     codename = models.CharField(_("Codename"), max_length=150)
     description = models.CharField(_("Description"), max_length=250)
-    permissions = models.ManyToManyField(Permission, related_name="roles", through="RolePermission")
+    permissions = models.ManyToManyField(
+        Permission, related_name="roles", through="RolePermission"
+    )
     project_content_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, blank=True
     )
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey("project_content_type", "project_id")
     enabled = models.BooleanField(_("Enabled?"), default=True)
+
+    JSON_DATA_FIELDS = [
+        "name",
+        "codename",
+        "description",
+        "project_id",
+        "enabled",
+    ]
 
     objects = NetsCoreBaseManager()
 
@@ -225,12 +236,16 @@ class Role(NetsCoreBaseModel):
     def save(self, *args, **kwargs):
         self.codename = self.codename.lower()
         super(Role, self).save(*args, **kwargs)
-        
+
+
 class RolePermission(NetsCoreBaseModel):
     role = models.ForeignKey(Role, on_delete=models.CASCADE)
     permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
-    custom_name = models.CharField(_("Custom name"), max_length=150, null=True, blank=True)
+    custom_name = models.CharField(
+        _("Custom name"), max_length=150, null=True, blank=True
+    )
 
+    JSON_DATA_FIELDS = ["role_id", "permission_id", "custom_name"]
     objects = NetsCoreBaseManager()
 
     class Meta:
@@ -263,6 +278,8 @@ class UserRole(NetsCoreBaseModel):
     project = GenericForeignKey("project_content_type", "project_id")
 
     objects = NetsCoreBaseManager()
+
+    JSON_DATA_FIELDS = ["user_id", "role_id", "project_content_type", "project_id"]
 
     class Meta:
         verbose_name = _("User Role")
@@ -398,6 +415,15 @@ class EmailTemplate(OwnedModel):
     )
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey("project_content_type", "project_id")
+    JSON_DATA_FIELDS = [
+        "name",
+        "html_body",
+        "text_body",
+        "enabled",
+        "use_for",
+        "project_content_type",
+        "project_id",
+    ]
 
     class Meta:
         verbose_name = _("Email Template")
@@ -430,6 +456,16 @@ class CustomEmail(OwnedModel):
     )
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey("project_content_type", "project_id")
+    JSON_DATA_FIELDS = [
+        "subject",
+        "to_email",
+        "from_email",
+        "html_body",
+        "txt_body",
+        "completed",
+        "sent_count",
+        "failed_count",
+    ]
 
     class Meta:
         verbose_name = _("Email")
@@ -462,6 +498,19 @@ class EmailNotification(NetsCoreBaseModel):
     )
     project_id = models.PositiveIntegerField(null=True, blank=True)
     project = GenericForeignKey("project_content_type", "project_id")
+    JSON_DATA_FIELDS = [
+        "subject",
+        "to",
+        "from_email",
+        "body",
+        "txt_body",
+        "sent",
+        "tries",
+        "sent_at",
+        "created",
+        "updated",
+        "custom_email_id",
+    ]
 
     def __str__(self):
         if self.project:
@@ -503,7 +552,18 @@ class UserDevice(OwnedModel):
     active = models.BooleanField(_("Active"), default=True)
     last_login = models.DateTimeField(_("Last login"), null=True)
     ip = models.CharField(_("IP"), max_length=250, null=True, blank=True)
-
+    JSON_DATA_FIELDS = [
+        "uuid",
+        "user_id",
+        "name",
+        "os",
+        "os_version",
+        "app_version",
+        "device_type",
+        "active",
+        "last_login",
+        "ip",
+    ]
     PROTECTED_FIELDS = ["device_token", "firebase_token"]
 
     class Meta:
@@ -530,6 +590,16 @@ class UserFirebaseNotification(OwnedModel):
     error = models.TextField(_("Error"), null=True, blank=True)
     device = models.ForeignKey(UserDevice, on_delete=models.CASCADE)
 
+    JSON_DATA_FIELDS = [
+        "message",
+        "data",
+        "sent",
+        "message_id",
+        "error",
+        "device_id",
+        "user_id",
+    ]
+    
     class Meta:
         verbose_name = _("User Firebase Notification")
         verbose_name_plural = _("User Firebase Notifications")

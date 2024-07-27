@@ -728,6 +728,17 @@ To send push notifications, you can use the following function:
         channel: str = 'default' # channel_id to send notification, default is 'default'
     )
 
+You can test push notifications with command line:
+
+.. code-block:: bash
+    
+    # Test with token
+    ./manage.py send_push_notification --firebase_token 'device_token' 
+    # Test with user id
+    ./manage.py send_push_notification --user_id 'user_id'
+
+Additionally, you can set title and message with --title and --message respectively.
+
 
 Dependencies
 ============
