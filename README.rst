@@ -281,6 +281,7 @@ Set verification code expire time
 
     NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS = 15*60 # 900 seconds
 
+
 Set email footer
 ^^^^^^^^^^^^^^^^
 
@@ -300,6 +301,7 @@ Set email debug
 ^^^^^^^^^^^^^^^
 
 Enable sent emails while settings.DEBUG is True, default to False. Enable if you want sent emails in development
+
 .. code-block:: python
 
     NETS_CORE_EMAIL_DEBUG_ENABLED = True
@@ -371,6 +373,232 @@ To enabled authentication provided by nets_core include auth.urls in your projec
         ...
     ]
 
+This will include the following endpoints:
+
+.. code-block:: python
+
+    urlpatterns = [        
+        path('login/', views.auth_login, name='login'),
+        path('logout/', views.auth_logout, name='logout'),
+        path('authenticate/', views.auth, name='authenticate'),
+        path('update/', views.update_user, name='update'),
+        path('getProfile/', views.auth_get_profile, name='getProfile'),
+        # request account deletion, complain with GDPR see https://gdpr.eu/right-to-be-forgotten/ 
+        # and google https://support.google.com/googleplay/android-developer/answer/13327111?hl=en
+        # to deploy apps in google play store
+        # to expand info to this view include NETS_CORE_DELETE_ACCOUNT_TEMPLATE in settings.py
+        path('requestDelete/', views.request_delete_user_account, name='requestDelete'), 
+        path('delete/', views.delete_user_account, name='delete'),
+    ]
+
+Login Request and Authentication:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+.. note::
+    Requirement:
+
+    Create a new OAuth2 application in your Django admin, this will provide you with a client_id and client_secret.
+    see: https://django-oauth-toolkit.readthedocs.io/en/latest/tutorial/tutorial_01.html#create-an-oauth2-client-application
+
+Django-nets-core implement OTP authentication for login, this will send an email with a verification code to the user email,
+send POST request to /login/ with USERNAME_FIELD of user model.
+
+.. code-block:: JavaScript
+
+    fetch('/login/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            username: 'myUsername', // if you set the USERNAME_FIELD to email then use email parameter
+            // device is optional, if provided will link verification code to device
+            // required if you want to use firebase messaging to send push notifications
+            // only in login request are accepted device registration, you can implement your own device registration
+            // from nets_core.models import UserDevice
+            device: {            
+                "name": "device name",
+                "os": "os",
+                "os_version": "os_version",
+                "device_token": "device_token",
+                "firebase_token": "firebase_token",
+                "app_version": "app_version",
+                "device_id": "device_id",
+                "device_type": "device_type",
+            }
+        })
+    })
+    .then(response => response.json()) // {res: 1, data: "CODE SENT", extra: {device_uuid: 'uuid'}}
+    ... 
+
+This will send an email with a verification code to the user email, send POST request to /authenticate/ with the verification code
+if device is provided, the device_uuid is required to complete the authentication.
+
+.. code-block:: JavaScript
+
+    fetch('/authenticate/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            username: 'myUsername', // should match with USERNAME_FIELD of user model ex: email: 'my@email.com'
+            code: '123456', // verification code if DEBUG is True, code will be always 123456 and emails will not be sent, except if NETS_CORE_EMAIL_DEBUG_ENABLED is True
+            client_id: 'client_id',
+            client_secret: 'client_secret',
+            device_uuid: 'uuid' // optional, required if device is provided in login request
+        })
+    })
+    .then(response => response.json()) // {res: 1, data: "AUTHENTICATED", extra: {access_token: 'token', refresh_token: 'refresh_token'}}
+    
+    // success response
+    {
+        "access_token": access_token.token,
+        "refresh_token": refresh_token.token,
+        "token_expire": access_token.expires,
+        "user": jsonUser // set JSON_DATA_FIELDS in your user model to include fields in jsonUser or override to_json method
+    }
+    // error response
+    {
+        "res": 0,
+        "error": "error message"
+    }
+
+
+Authenticated requests:
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Include access_token in Authorization header to authenticate requests
+
+.. code-block:: JavaScript
+
+    fetch('/myview/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token
+        }
+    })
+    .then(response => response.json())
+
+
+Logout:
+^^^^^^^
+
+Send POST request to /logout/ with access_token in Authorization header to logout
+cookies will be removed and access_token will be invalidated
+
+.. code-block:: JavaScript
+
+    fetch('/logout/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token,
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json()) // {res: 1, data: "LOGGED OUT"}
+
+Update user model fields:
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. WARNING:: 
+    PROTECT SENSITIVE FIELDS
+
+    To protect sensitive fields, some fields are prohibited from being updated, see NETS_CORE_USER_PROHIBITED_FIELDS
+
+
+
+.. NOTE::
+    Only authenticated user
+
+    This endpoint only updated the authenticated user, to update other users use Django admin or your own endpoint
+
+Send POST request to /update/ with access_token in Authorization header to update user model fields
+
+.. code-block:: JavaScript
+
+    fetch('/update/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token,
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            first_name: 'new first name',
+            last_name: 'new last name',
+            ... // other fields to update
+        })
+    })
+    .then(response => response.json()) // {res: 1, data: {...jsonUser}}
+
+
+Get user profile:
+^^^^^^^^^^^^^^^^^
+
+.. NOTE:: 
+    Only authenticated user
+    
+    This endpoint only return the authenticated user profile, implement your own endpoint
+
+Send GET request to /getProfile/ with access_token in Authorization header to get user profile
+
+.. code-block:: JavaScript
+
+    fetch('/getProfile/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token
+        }
+    })
+    .then(response => response.json()) // {res: 1, data: {...jsonUser}}
+
+
+Request account deletion:
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Link users to /requestDelete/ to request account deletion, render a form to confirm account deletion
+
+
+Delete user account:
+^^^^^^^^^^^^^^^^^^^^
+
+To implement your own view to confirm account deletion, request an access code to /login/ then 
+Send POST request to /delete/ two parameters sure and code.
+
+.. code-block:: JavaScript
+
+    fetch('/delete/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + access_token,
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            sure: true, // required to confirm account deletion
+            code: '123456' // verification code to confirm account deletion, should be requested in /requestDelete/
+        })
+    })
+    .then(response => response.json()) // {res: 1, data: "Account deleted successfully"}
+
+
+To ensure this deletion run without errors, set CASCADE in all relations to user model,
+this will delete all related objects to user model, if not set CASCADE, this will raise an error and account will not be deleted.
+
+.. code-block:: python
+
+    class MyModel(models.Model):
+        user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class MyModel2(models.Model):
+        user = models.ForeignKey(User, on_delete=models.CASCADE)
 
 Enabled testers for tests or third party verifications
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -448,7 +676,57 @@ DJANGO SETTINGS
 .. code-block:: python
 
     # firebase credentials
+    # required if you want to use firebase messaging to send push notifications
     FIREBASE_CONFIG = os.path.join(BASE_DIR, 'firebase-credentials.json')
+    # "Service account certificates can be downloaded as JSON files from
+    # the Firebase console. To instantiate a credential from a certificate file, 
+    # either specify the file path or a dict representing the parsed contents of the file."
+
+
+To generate a firebase credentials file, go to your firebase project configuration,
+select service accounts, and generate a new private key, this will download 
+a JSON file with your credentials.
+
+Alternatively, you can set FIREBASE_CONFIG environment variable to the path of your
+ credentials file.
+
+.. code-block:: bash
+
+    # linux / mac
+    export FIREBASE_CONFIG=/path/to/your/firebase-credentials.json
+    # windows
+    set FIREBASE_CONFIG=/path/to/your/firebase-credentials.json
+
+.. code-block:: python
+
+    # or set it in your settings.py
+    FIREBASE_CONFIG = '/path/to/your/firebase-credentials.json'
+
+
+To send push notifications, you can use the following function:
+
+.. code-block:: python
+
+    from nets_core.firebase_messages import send_user_device_notification
+    # to send notification to all devices registered to user
+    # will use all tokens registered in nets_core_user_device table
+    # returns dict[device.id] = {'success': True, 'message_id': '1234'} or {'success': False, 'error': 'error message'} 
+    devices_results = send_user_device_notification(
+        user, # user object 
+        title: str, # title of notification
+        message: str, # body of notification
+        data: dict, # data to send with notification, all keys and values should be strings, this will be sent as data in notification
+        channel: str = 'default' # channel_id to send notification, default is 'default'
+    )
+    # to send to a specific device
+    from nets_core.firebase_messages import send_fb_message
+    send_fb_message(
+        title: str, # title of notification
+        message: str, # body of notification
+        device_token: str, # device token to send notification
+        data: dict, # data to send with notification, all keys and values should be strings, this will be sent as data in notification
+        channel: str = 'default' # channel_id to send notification, default is 'default'
+    )
 
 
 Dependencies
