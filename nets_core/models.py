@@ -325,6 +325,9 @@ class VerificationCode(OwnedModel):
 
     def save(self, *args, **kwargs):
         token = 123456
+        if hasattr(settings, "NETS_CORE_DEBUG_VERIFICATION_CODE"):
+            token = settings.NETS_CORE_DEBUG_VERIFICATION_CODE
+            
         cache_token_key = self.get_token_cache_key()
         tester_emails = ["google_tester*"]
         # check if settings has testers emails
@@ -350,8 +353,11 @@ class VerificationCode(OwnedModel):
             token = 789654
             if hasattr(settings, "NETS_CORE_TESTERS_VERIFICATION_CODE"):
                 token = settings.NETS_CORE_TESTERS_VERIFICATION_CODE
+        email_enabled = False
+        if  hasattr(settings, "NETS_CORE_EMAIL_DEBUG_ENABLED"):
+            email_enabled = settings.NETS_CORE_EMAIL_DEBUG_ENABLED
 
-        if not settings.DEBUG and not is_tester:
+        if (not settings.DEBUG or email_enabled) and not is_tester :
             # Check cache if token is present and return the same token
             token = cache.get(cache_token_key)
             if not token:

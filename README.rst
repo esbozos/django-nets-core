@@ -164,6 +164,76 @@ check https://docs.djangoproject.com/en/4.1/topics/cache/ and pick your preferen
         }
     }
 
+
+Sending emails
+______________
+
+To send emails with advanced features, use send_email function from nets_core.mail module
+
+.. code-block:: python
+
+    from nets_core.mail import send_email
+
+
+params:
+^^^^^^^
+
+    subject: str, # subject of email
+    email: str|list[str], # email or list of emails to send email
+    template: str, # template to use for email
+    context: dict, # context to use in template
+    txt_template: str = None, # text template to use for email, if not set, will use template
+    to_queued: bool = True, # if True will be saved to database and sent by celery task, if False will be sent immediately
+    force: bool = False, # if True will send email even if NETS_CORE_EMAIL_DEBUG_ENABLED is False
+    html: str = None, # html content to use in email, if not set will use template
+
+.. code-block:: python
+
+    from nets_core.mail import send_email
+
+    # example of use
+    email_sent, reason, description = send_email(
+        subject='Subject of email',
+        email=['someone@gmail.com', 'somefake@excludedomain.com'],
+        template='myapp/email_template.html',
+        context={
+            'news_title': 'This is a title',
+            'news_content': 'This is a content',
+        },
+        txt_template='myapp/email_template.txt',
+        to_queued=True,
+    )
+
+    if not email_sent:
+        print(f'Email not sent, reason: {reason}, description: {description}')
+
+    # if NETS_CORE_EMAIL_EXCLUDE_DOMAINS is set, emails to excluded domains will not be sent example: ['excludedomain.com']
+    # will sent only to valid emails in email list and description will include excluded emails
+    # domain exclude can be set with * to exclude all emails that end with the string before the *
+    # example: ['fakeemail*'] will exclude all emails that end with fakeemail: fakeemail.com, fakeemail.org, fakeemail1.com, etc.
+
+
+Reason returned can be:
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    EMAIL_REASONS = {
+        'invalid_email': _('Invalid email address'),
+        'email_domain_excluded': _('Email domain is in NETS_CORE_EMAIL_EXCLUDE_DOMAINS'),
+        'empty_email': _('Email is empty'),
+        'template_not_found': _('Template does not exist'),
+        'template_syntax_error': _('Template syntax error'),
+        'template_or_html_required': _('template or html content for send_email is required'),
+        'email_not_sent': _('Email wasn\'t sent'),
+        'email_sent': _('Email sent'),
+        'email_in_queue': _('Email in queue.'),
+        'email_disabled': _('emails are disabled while debug is true in settings')
+    }
+    
+
+
+
 NETS_CORE SETTINGS
 __________________
 
@@ -282,6 +352,21 @@ Set verification code expire time
     NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS = 15*60 # 900 seconds
 
 
+Set default verification code while DEBUG is True
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, verification code will be 123456 if DEBUG is True, this will avoid sending emails in development and testing
+if you want to set a different code, set NETS_CORE_DEBUG_VERIFICATION_CODE
+
+.. code-block:: python
+
+    NETS_CORE_DEBUG_VERIFICATION_CODE = '654321' # default is 123456 if not set
+
+.. warning::
+
+    If NETS_CORE_EMAIL_DEBUG_ENABLED is set to True, emails will be sent in development and testing and code will randomly generated.
+
+
 Set email footer
 ^^^^^^^^^^^^^^^^
 
@@ -289,7 +374,7 @@ Set email footer
 
     NETS_CORE_EMAIL_FOOTER_ENABLED = True 
     NETS_CORE_EMAIL_FOOTER = '<p>Thank you for using our service </p>' # html email footer
-    NETS_CORE_EMAIL_FOOTER_TEMPLATE = 'myapp/email_foote.html' # template to use for email footer
+    NETS_CORE_EMAIL_FOOTER_TEMPLATE = 'myapp/email_footer.html' # template to use for email footer
 
 
 .. warning::
@@ -315,9 +400,16 @@ like service providers as mailinator.com, temp-mail.org, guerillamail.com, email
 
 .. code-block:: python
 
-    NETS_CORE_EMAIL_EXCLUDE_DOMAINS = ['mailinator.com', 'temp-mail.org', 'guerillamail.com', 'emailondeck.com', 'ironmail.com', 'cloakmail.com', '10minutemail.com', '33mail.com', 'maildrop.cc']
+    NETS_CORE_EMAIL_EXCLUDE_DOMAINS = ['mailinator*', 'temp-mail.org', 'guerillamail.com', 'emailondeck.com', 'ironmail.com', 'cloakmail.com', '10minutemail.com', '33mail.com', 'maildrop.cc']
 
 This will avoid to send emails to these domains: example user request access with me@guerillamail.com will not receive any email
+domains can contain * to exclude all emails that end with the string before the * example: ['mailinator*'] will exclude all emails that end with mailinator: mailinator.com, mailinator.org, mailinator1.com, etc.
+
+if a email list is provided to send_email function, emails to excluded domains will not be sent and description will include excluded emails, valid emails will be sent.
+
+.. info::
+
+    see send_email section for more info :ref:`Sending emails`
 
 
 Set verification code cache key
@@ -328,11 +420,9 @@ Set cache key to store verification code, default is 'NC_T'
 
     NETS_CORE_VERIFICATION_CODE_CACHE_KEY = 'NC_T'
 
-Set prohibited fields
-^^^^^^^^^^^^^^^^^^^^^
 
-.. warning::
-    This will be deprecated in future versions, use PROTECTED_FIELDS in your model class to exclude fields from being updated by auth.urls
+Exclude fields from user model to be updated by auth.urls
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 nets_core.auth_urls provide endpoints to update user model fields, you can exclude some fields from being updated by auth.urls
 
@@ -340,7 +430,7 @@ Set fields that should not be updated by auth.urls
 
 .. code-block:: python
 
-    prohibited_fields = [
+    PROTECTED_FIELDS = [
         "password",
         "is_superuser",
         "is_staff",
@@ -435,6 +525,9 @@ send POST request to /login/ with USERNAME_FIELD of user model.
 
 This will send an email with a verification code to the user email, send POST request to /authenticate/ with the verification code
 if device is provided, the device_uuid is required to complete the authentication.
+
+.. note::
+    If User model has email_verified field, this will be set to True after first successful authentication
 
 .. code-block:: JavaScript
 

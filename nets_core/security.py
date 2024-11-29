@@ -89,7 +89,7 @@ def authenticate(
     vcode.verified = True
     vcode.save()
 
-    if hasattr(user, "email_verified"):
+    if hasattr(user, "email_verified") and not user.email_verified:
         user.email_verified = True
     user.last_login = timezone.now()
     user.save()

@@ -4,21 +4,8 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 GLOBAL_PROTECTED_FIELDS = [
-    'password',
-    'is_active',
-    'enabled',
-    'staff',
-    'superuser',
-    'verified',
-    'deleted',
-    'token',
-    'auth',
-    'perms',
-    'groups',
-    'ip'
-    'date_joined',
-    'last_login',
-    
+    'password',    
+    'superuser',    
 ]
 
 if hasattr(settings, "NETS_CORE_GLOBAL_PROTECTED_FIELDS"):
