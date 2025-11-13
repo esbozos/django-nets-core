@@ -56,7 +56,6 @@ def valid_gender(s):
     ],
 )
 def auth_login(request):
-    print(request.params)
     try:
         defaults = {}
         for key, val in request.params._asdict().items():
@@ -81,65 +80,68 @@ def auth_login(request):
         )
 
         device = None
+        try:
+            device = UserDevice(user=new_user).validate_request(request)
+        except Exception as e:
+            return error_response(e.__str__(), 400)
+        # if hasattr(request.params, "device") and request.params.device is not None:
+        #     valid_device_fields = [
+        #         "name",
+        #         "os",
+        #         "os_version",
+        #         "device_token",
+        #         "firebase_token",
+        #         "app_version",
+        #         "device_id",
+        #         "device_type",
+        #     ]
+        #     device_data = {}
 
-        if hasattr(request.params, "device") and request.params.device is not None:
-            valid_device_fields = [
-                "name",
-                "os",
-                "os_version",
-                "device_token",
-                "firebase_token",
-                "app_version",
-                "device_id",
-                "device_type",
-            ]
-            device_data = {}
+        #     for key, val in request.params.device.items():
+        #         if key in valid_device_fields:
+        #             device_data[key] = val
 
-            for key, val in request.params.device.items():
-                if key in valid_device_fields:
-                    device_data[key] = val
+        #     if "uuid" in request.params.device and request.params.device["uuid"]:
+        #         logger.info(
+        #             f"Device uuid {request.params.device['uuid']} found in auth request"
+        #         )
+        #         try:
+        #             device = UserDevice.objects.get(
+        #                 uuid=request.params.device["uuid"], user=new_user
+        #             )
 
-            if "uuid" in request.params.device and request.params.device["uuid"]:
-                logger.info(
-                    f"Device uuid {request.params.device['uuid']} found in auth request"
-                )
-                try:
-                    device = UserDevice.objects.get(
-                        uuid=request.params.device["uuid"], user=new_user
-                    )
+        #             for key, val in device_data.items():
+        #                 setattr(device, key, val)
+        #             device.save()
 
-                    for key, val in device_data.items():
-                        setattr(device, key, val)
-                    device.save()
+        #             # TODO: Notification to user to new login from device
 
-                    # TODO: Notification to user to new login from device
+        #         except UserDevice.DoesNotExist:
+        #             # uuid does not exist or is not associated with user
+        #             # delete user if created as invalid request is made
+        #             logger.warning(
+        #                 f"Invalid device uuid {request.params.device['uuid']} found in auth request from user request {request.params}"
+        #             )
+        #             if created:
+        #                 new_user.delete()
 
-                except UserDevice.DoesNotExist:
-                    # uuid does not exist or is not associated with user
-                    # delete user if created as invalid request is made
-                    logger.warning(
-                        f"Invalid device uuid {request.params.device['uuid']} found in auth request from user request {request.params}"
-                    )
-                    if created:
-                        new_user.delete()
-
-                    return error_response(_("Invalid device uuid"), 400)
-            else:
-                # new device
-                device_data["user"] = new_user
-                if "firebase_token" in device_data:
-                    device = UserDevice.objects.filter(
-                        firebase_token=device_data["firebase_token"], user=new_user
-                    )
-                    if device.exists():
-                        device = device.first()
-                        for key, val in device_data.items():
-                            setattr(device, key, val)
-                        device.save()
-                    else:
-                        device = UserDevice.objects.create(**device_data)
-                else:
-                    device = UserDevice.objects.create(**device_data)
+        #             return error_response(_("Invalid device uuid"), 400)
+        #     else:
+        #         # new device
+        #         device_data["user"] = new_user
+        #         if "firebase_token" in device_data:
+        #             device = UserDevice.objects.filter(
+        #                 firebase_token=device_data["firebase_token"], user=new_user
+        #             )
+        #             if device.exists():
+        #                 device = device.first()
+        #                 for key, val in device_data.items():
+        #                     setattr(device, key, val)
+        #                 device.save()
+        #             else:
+        #                 device = UserDevice.objects.create(**device_data)
+        #         else:
+        #             device = UserDevice.objects.create(**device_data)
 
         # create verification code, listeners will send email/sms and devices notifications
         # with firebase

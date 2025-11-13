@@ -29,7 +29,10 @@ def pre_save_base_model_handler(sender, instance, **kwargs):
         # NetsCoreBaseModel implements updated_fields property to track fields that have changed
         # is a dict of field_name: [{'old': old_value, 'new': new_value, 'time': time}]
         untracked_fields = ["password", "token", "updated_fields"]
-        previous_instance = sender.objects.get(pk=instance.pk)
+        try:
+            previous_instance = sender.objects.get(pk=instance.pk)
+        except sender.DoesNotExist:
+            return
         for field in instance._meta.fields:
             if not hasattr(field, "column") or field.column in (
                 "created_at",

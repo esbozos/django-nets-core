@@ -95,14 +95,38 @@ def authenticate(
     user.save()
 
     # Create access and refresh token
+    expires = get_expiration_time()
+    
+    return generate_tokens(user, oauth_app, expires)
+
+def get_expiration_time():
+    """
+    Get expiration time in seconds from settings.ACCESS_TOKEN_EXPIRE_SECONDS
+    or return 60 * 60 * 24 * 30 (30 days as default)
+    """
     expire_seconds = 60 * 60 * 24 * 30  # 30 days as default
     try:
         expire_seconds = settings.ACCESS_TOKEN_EXPIRE_SECONDS
     except:
         pass
+    
+    return timezone.now() + timezone.timedelta(seconds=expire_seconds)
 
-    expires = timezone.now() + timezone.timedelta(seconds=expire_seconds)
+def generate_tokens(user, oauth_app, expires=None):
+    """
+    Generate access and refresh tokens for user
+    Parameters:
+    user (instance): Instance of settings.AUTH_MODEL_MODEL
+    oauth_app (instance): Instance of oauth2_provider.models.Application
+    expires (datetime): Expiration date for access token
+    
+    Returns:
+    dict: {"access_token": str, "refresh_token": str, "token_expires": datetime }
 
+    """
+    if not expires:
+        expires = get_expiration_time()
+    
     access_token = AccessToken.objects.create(
         user=user,
         expires=expires,

@@ -579,10 +579,71 @@ class UserDevice(OwnedModel):
 
     def __str__(self):
         return self.name
+    
+    def validate_request(self, request):
+        if not hasattr(request, "params") or not hasattr(request.params, "device") or not request.params.device:
+            raise ValueError(_("Request must have a device object"))
+        
+        
+        valid_device_fields = [
+            "name",
+            "os",
+            "os_version",
+            "device_token",
+            "firebase_token",
+            "app_version",
+            "device_id",
+            "device_type",
+        ]
+        device_data = {}
+
+        for key, val in request.params.device.items():
+            if key in valid_device_fields:
+                device_data[key] = val
+
+        if "uuid" in request.params.device and request.params.device["uuid"]:            
+            try:
+                device = UserDevice.objects.get(
+                    uuid=request.params.device["uuid"], user=self.user
+                )
+
+                for key, val in device_data.items():
+                    setattr(device, key, val)
+                device.save()
+                return device
+
+                # TODO: Notification to user to new login from device
+
+            except UserDevice.DoesNotExist:
+                # uuid does not exist or is not associated with user
+                # delete user if created as invalid request is made
+                raise ValueError(_("Invalid device uuid"))
+                
+        else:
+            # new device
+            device_data["user"] = self.user
+            if "firebase_token" in device_data:
+                device = UserDevice.objects.filter(
+                    firebase_token=device_data["firebase_token"], user=self.user
+                )
+                if device.exists():
+                    device = device.first()
+                    for key, val in device_data.items():
+                        setattr(device, key, val)
+                    device.save()
+                    
+                else:
+                    device = UserDevice.objects.create(**device_data)
+            else:
+                device = UserDevice.objects.create(**device_data)
+            
+            return device
 
     def save(self, *args, **kwargs):
 
         super(UserDevice, self).save(*args, **kwargs)
+        
+    
 
 
 class UserFirebaseNotification(OwnedModel):

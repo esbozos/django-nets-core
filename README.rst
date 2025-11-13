@@ -407,9 +407,9 @@ domains can contain * to exclude all emails that end with the string before the 
 
 if a email list is provided to send_email function, emails to excluded domains will not be sent and description will include excluded emails, valid emails will be sent.
 
-.. info::
+.. warning::
 
-    see send_email section for more info :ref:`Sending emails`
+    see Sending emails for more info
 
 
 Set verification code cache key
