@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def request_handler(
     obj=None, 
-    can_do: str=None, 
+    can_do: str|list[str]=None, 
     perm_required: bool=False, 
     params: dict|list[RequestParam]={}, 
     optionals: dict={}, 
@@ -99,9 +99,39 @@ def request_handler(
                 return request
             
             perm = public
+            
             if can_do:
-                # TODO: log permission check
-                perm = check_perm(request.user, can_do, request.project)              
+                if isinstance(can_do, str):
+                    can_do = [can_do]
+                for cdo in can_do:
+                    perm = check_perm(request.user, cdo, request.project)
+                    if not perm:
+                        break
+
+                # # TODO: log permission check
+                # permissions = []
+
+                # if isinstance(can_do[0], str) and "." in can_do[0]:
+                #     perm = True
+
+                #     for perm_str in can_do:
+                #         app_action = perm_str.split(".")
+
+                #         p = check_perm(
+                #             request.user, app_action[1], app_action[0], request.project
+                #         )
+                #         permissions.append([app_action[1], app_action[0], p])
+                #         if not p:
+                #             # when one of the permissions is False, 
+                #             # set perm to False and break
+                #             perm = False
+                #             break
+                # else:
+                #     perm = check_perm(
+                #         request.user, can_do[0], can_do[1], request.project
+                #     )
+                #     permissions.append([can_do[0], can_do[1], perm])
+                # perm = check_perm(request.user, can_do, request.project)              
                 
                 # log_permission_check.delay(request.user.id, can_do, access=perm, customer_id=customer_id)
 
