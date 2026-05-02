@@ -19,6 +19,7 @@ nh3==0.2.18
 pkginfo==1.10.0
 pycparser==2.22
 Pygments==2.18.0
+PyJWT==2.9.0
 readme_renderer==44.0
 requests==2.32.3
 requests-toolbelt==1.0.0
