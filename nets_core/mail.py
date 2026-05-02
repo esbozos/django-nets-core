@@ -10,6 +10,7 @@ from nets_core.models import EmailNotification
 from django.utils.module_loading import import_string
 from django.core.mail.backends.smtp import EmailBackend
 import logging
+import mimetypes
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,45 @@ EMAIL_REASONS = {
     'email_not_sent': _('Email wasn\'t sent'),
     'email_sent': _('Email sent'),
     'email_in_queue': _('Email in queue.'),
-    'email_disabled': _('emails are disabled while debug is true in settings')
+    'email_disabled': _('emails are disabled while debug is true in settings'),
+    'invalid_attachment': _('Invalid attachment format')
 }
+
+
+def _normalize_attachments(attachments):
+    """
+    Normalize accepted attachment formats to Django's attach signature:
+    (filename, content, mimetype)
+    """
+    if not attachments:
+        return []
+
+    normalized = []
+    for item in attachments:
+        # tuple/list: (filename, content) or (filename, content, mimetype)
+        if isinstance(item, (tuple, list)):
+            if len(item) == 2:
+                filename, content = item
+                mimetype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+                normalized.append((filename, content, mimetype))
+                continue
+            if len(item) == 3:
+                filename, content, mimetype = item
+                normalized.append((filename, content, mimetype))
+                continue
+            raise ValueError(EMAIL_REASONS['invalid_attachment'])
+
+        # UploadedFile / File-like objects
+        if hasattr(item, 'read') and hasattr(item, 'name'):
+            filename = item.name
+            content = item.read()
+            mimetype = getattr(item, 'content_type', None) or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+            normalized.append((filename, content, mimetype))
+            continue
+
+        raise ValueError(EMAIL_REASONS['invalid_attachment'])
+
+    return normalized
 
 def valid_email_domain(email):
     if not email:
@@ -77,8 +115,9 @@ def valid_email_domain(email):
     return True, None
     
 
-def send_email(subject: str, email: str|list[str], template: str, context: dict, 
-    txt_template: str = None, to_queued: bool = True, force=False, html: str =None, **kwargs):
+def send_email(subject: str, email: str|list[str], template: str, context: dict,
+    txt_template: str = None, to_queued: bool = True, force=False, html: str =None,
+    attachments: list|tuple|None = None, **kwargs):
     """
         Create a email to be sent by command line ./manage.py send_emails
         or dispatch if to_queued is set to False
@@ -86,6 +125,15 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
 
     if settings.DEBUG and not mail_debug_enabled and not force:
         return (False, 'email_disabled', EMAIL_REASONS['email_disabled'])
+
+    # Backward compatibility for callers using "files" keyword.
+    if attachments is None:
+        attachments = kwargs.get('files')
+
+    try:
+        normalized_attachments = _normalize_attachments(attachments)
+    except ValueError as e:
+        return (False, 'invalid_attachment', str(e))
 
     reason = ''
     # Exclude emails from exclude_domain
@@ -142,6 +190,11 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
     if txt_template:
         content_txt = render_to_string(txt_template)
     
+    # EmailNotification does not persist attachments; send immediately when present.
+    if normalized_attachments and to_queued:
+        logger.warning('Attachments are not supported in queued emails; sending immediately.')
+        to_queued = False
+
     if to_queued:
 
         if content_txt:
@@ -153,12 +206,13 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
 
     else:
         try:
-            msg = EmailMultiAlternatives(**params)
             msg = EmailMultiAlternatives(
                 subject, content_html, settings.DEFAULT_FROM_EMAIL, email)
             msg.content_subtype = "html"
             if content_txt:
                 msg.attach_alternative(content_txt, "text/plain")
+            for filename, content, mimetype in normalized_attachments:
+                msg.attach(filename, content, mimetype)
             result = msg.send(fail_silently=False)
             if result:
                 return (True, 'email_sent', EMAIL_REASONS['email_sent'] + ' ' + str(result) + ' ' + reason)
@@ -167,6 +221,24 @@ def send_email(subject: str, email: str|list[str], template: str, context: dict,
         except Exception as e:
             print(e)
             return (False, 'email_not_sent', EMAIL_REASONS['email_not_sent'] + ' ' + reason)
+
+
+def send_mail(subject: str, email: str|list[str], template: str, context: dict,
+    txt_template: str = None, to_queued: bool = True, force=False, html: str =None,
+    files: list|tuple|None = None, **kwargs):
+    """Compatibility wrapper for callers expecting send_mail and files kwargs."""
+    return send_email(
+        subject=subject,
+        email=email,
+        template=template,
+        context=context,
+        txt_template=txt_template,
+        to_queued=to_queued,
+        force=force,
+        html=html,
+        attachments=files,
+        **kwargs,
+    )
 
 
 def brandmark_template(html):

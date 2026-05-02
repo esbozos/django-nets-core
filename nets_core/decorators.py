@@ -99,11 +99,12 @@ def request_handler(
                 return request
             
             perm = public
+            allowed_actions = can_do
             
-            if can_do:
-                if isinstance(can_do, str):
-                    can_do = [can_do]
-                for cdo in can_do:
+            if allowed_actions:
+                if isinstance(allowed_actions, str):
+                    allowed_actions = [allowed_actions]
+                for cdo in allowed_actions:
                     perm = check_perm(request.user, cdo, request.project)
                     if not perm:
                         break
