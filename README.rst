@@ -1,62 +1,67 @@
 Django NETS CORE
 ================
 
-Production-oriented toolkit for Django APIs: request validation, OTP login, OAuth2 token issuance, social login, role/permission management, email delivery, and push notifications.
+Production-oriented toolkit for Django APIs with built-in request validation,
+OTP authentication, OAuth2 token issuance, project-scoped permissions,
+email delivery, push notifications, and social login providers.
 
-Status
-------
+Overview
+--------
 
-This package is actively evolving. Current release metadata is managed in setup.cfg.
+NETS CORE reduces boilerplate across common backend concerns:
 
-Why NETS CORE
--------------
+- Input validation and coercion for API payloads.
+- Authentication flows with verification codes and OAuth2 tokens.
+- Social login onboarding.
+- Role and permission management (global and project-scoped).
+- User device tracking.
+- Email and push notification integration.
+- Model serialization patterns with protected fields support.
 
-NETS CORE helps teams ship API backends faster by reducing repeated boilerplate in:
+What Is Included
+----------------
 
-- Request parsing and strict parameter validation.
-- Authentication flows (OTP + OAuth2 token generation).
-- Social sign-in onboarding.
-- Role and permission assignment (global and project-scoped).
-- Email and push notification plumbing.
-- JSON serialization patterns for model responses.
+Core API endpoints are exposed through auth URLs:
 
-Core Capabilities
------------------
+- POST /login/
+- POST /authenticate/
+- POST /logout/
+- POST /update/
+- GET/POST /getProfile/
+- GET/POST /requestDelete/
+- POST /delete/
 
-Authentication and Sessions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Social login endpoints:
 
-- OTP flow with verification code model, expiration, and cache-backed checks.
-- OAuth2 access and refresh token generation using django-oauth-toolkit.
-- Social login endpoints for Google, Apple, Facebook, Microsoft, and GitHub.
-- Legacy Google endpoint preserved for backwards compatibility.
+- POST /loginWithGoogle/ (legacy endpoint kept for compatibility)
+- POST /loginWithGoogleSocial/ (new unified flow)
+- POST /loginWithApple/
+- POST /loginWithFacebook/
+- POST /loginWithMicrosoft/
+- POST /loginWithGithub/
 
-Validation and Endpoint Ergonomics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Built-in models:
 
-- request_handler decorator for auth checks, permission checks, object loading, and param parsing.
-- RequestParam type conversion for common API types (str, int, bool, float, date, datetime, dict, list, email, file).
-- Unified JSON success/error response helpers.
+- NetsCoreBaseModel
+- OwnedModel
+- Permission
+- Role
+- RolePermission
+- UserRole
+- VerificationCode
+- UserDevice
+- EmailTemplate
+- CustomEmail
+- EmailNotification
+- UserFirebaseNotification
 
-Data and Access Model
-^^^^^^^^^^^^^^^^^^^^^
+Built-in helpers/services:
 
-- Abstract base models with automatic created/updated timestamps.
-- updated_fields tracking for model change history.
-- Built-in Permission, Role, RolePermission, and UserRole models.
-- Optional project-scoped role/permission resolution.
-
-Communications
-^^^^^^^^^^^^^^
-
-- Email delivery with template rendering, queue support, domain filtering, optional attachments, and debug controls.
-- Firebase Cloud Messaging integration for device-targeted notifications.
-
-Developer Tooling
-^^^^^^^^^^^^^^^^^
-
-- Management command to inspect/bootstrap expected settings: nets-settings.
-- Django admin registrations for core auth/email/permission entities.
+- request_handler decorator and RequestParam parser.
+- Token generation/authentication helpers.
+- Email sending service with queue/immediate modes.
+- Firebase push helpers.
+- Settings bootstrap command.
 
 Installation
 ------------
@@ -65,10 +70,14 @@ Installation
 
     pip install django-nets-core
 
-Quick Start
------------
+Dependencies are installed automatically from package metadata. Current notable
+runtime dependencies include Django, django-oauth-toolkit, google-auth,
+PyJWT, Celery, channels, channels-redis, firebase-admin, and cache backends.
 
-1) Add required apps:
+Minimal Integration
+-------------------
+
+1. Add required apps:
 
 .. code-block:: python
 
@@ -78,7 +87,7 @@ Quick Start
         "nets_core",
     ]
 
-2) Add auth URLs:
+2. Add URL routes:
 
 .. code-block:: python
 
@@ -88,7 +97,7 @@ Quick Start
         path("", include("nets_core.auth_urls", namespace="auth")),
     ]
 
-3) Ensure authentication backend compatibility:
+3. Configure authentication backends:
 
 .. code-block:: python
 
@@ -97,55 +106,122 @@ Quick Start
         "django.contrib.auth.backends.ModelBackend",
     ]
 
-4) Run migrations:
+4. Configure cache (required for verification code behavior in production):
+
+.. code-block:: python
+
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+            "LOCATION": "127.0.0.1:11211",
+        }
+    }
+
+5. Run migrations:
 
 .. code-block:: bash
 
     python manage.py migrate
 
-5) Verify settings scaffold:
+6. Validate/setup baseline settings:
 
 .. code-block:: bash
 
     python manage.py nets-settings
 
-Authentication API
-------------------
+Management Commands
+-------------------
 
-Base Auth Endpoints
-^^^^^^^^^^^^^^^^^^^
+Check configuration:
 
-- POST /login/ -> creates/gets user and issues verification code.
-- POST /authenticate/ -> validates code and returns OAuth2 tokens.
-- POST /logout/ -> revokes session/token.
-- GET/POST /getProfile/ -> returns user profile fields.
-- POST /update/ -> updates user model fields (excluding protected ones).
+.. code-block:: bash
 
-Social Login Endpoints
-^^^^^^^^^^^^^^^^^^^^^^
+    python manage.py nets-settings
 
-- POST /loginWithGoogle/ (legacy endpoint from google_auth module).
-- POST /loginWithGoogleSocial/ (new unified social flow).
-- POST /loginWithApple/
-- POST /loginWithFacebook/
-- POST /loginWithMicrosoft/
-- POST /loginWithGithub/
+Generate/update baseline settings files:
 
-Social Endpoint Payload
-^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: bash
 
-All social endpoints receive:
+    python manage.py nets-settings --create
+    python manage.py nets-settings --create --force
+
+Push notification test helper:
+
+.. code-block:: bash
+
+    python manage.py test_push_notification
+
+Authentication
+--------------
+
+OTP Login Flow
+^^^^^^^^^^^^^^
+
+Step 1: request verification code (creates/updates user and device).
+
+Endpoint:
+
+- POST /login/
+
+Parameters:
+
+- User.USERNAME_FIELD (for example email or username, depending on your custom User model)
+- device (dict; should include device metadata)
+
+Supported device keys (current implementation):
+
+- name
+- os
+- os_version
+- device_token
+- firebase_token
+- app_version
+- device_id
+- device_type
+- uuid (optional, for updating an existing device)
+
+Example:
 
 .. code-block:: json
 
     {
-      "token": "provider_access_or_id_token",
-      "client_id": "oauth_application_client_id",
-      "client_secret": "oauth_application_client_secret"
+      "email": "user@example.com",
+      "device": {
+        "name": "Pixel 8",
+        "os": "Android",
+        "os_version": "15",
+        "firebase_token": "fcm_token",
+        "app_version": "1.0.0"
+      }
     }
 
-Social Endpoint Response
-^^^^^^^^^^^^^^^^^^^^^^^^
+Response:
+
+.. code-block:: json
+
+    {
+      "res": 1,
+      "data": "CODE SENT",
+      "extra": {
+        "device_uuid": "..."
+      }
+    }
+
+Step 2: authenticate code and issue OAuth tokens.
+
+Endpoint:
+
+- POST /authenticate/
+
+Parameters:
+
+- User.USERNAME_FIELD
+- code
+- client_id
+- client_secret
+- device_uuid (optional but recommended when device-bound verification is used)
+
+Response:
 
 .. code-block:: json
 
@@ -161,27 +237,130 @@ Social Endpoint Response
       }
     }
 
-Social Provider Configuration
------------------------------
+Logout
+^^^^^^
 
-Required provider settings depend on endpoint usage:
+Endpoint:
 
-- GOOGLE_CLIENT_ID for Google token validation.
-- APPLE_CLIENT_ID for Apple audience validation.
+- POST /logout/
 
-Facebook, Microsoft, and GitHub currently validate by calling provider APIs with the received token.
+Behavior:
 
-Important: OAuth2 application credentials (client_id/client_secret) are always validated against django-oauth-toolkit Application records before issuing NETS CORE tokens.
+- Removes device if device_uuid is sent.
+- Deletes OAuth access token from Authorization header when present.
+- Clears Django session.
 
-Legacy Compatibility Note
--------------------------
+Using the authenticate helper directly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The original Google implementation remains available at /loginWithGoogle/. New projects should prefer /loginWithGoogleSocial/ to keep all providers under one shared flow.
+If you want to build a custom endpoint flow, you can call the helper in
+nets_core.security:
 
-Using request_handler
----------------------
+.. code-block:: python
 
-Example:
+    from nets_core.security import authenticate
+
+    tokens = authenticate(
+        user=user,
+        code="123456",
+        client_id="your_client_id",
+        client_secret="your_client_secret",
+        device_uuid=device_uuid,  # optional
+    )
+
+Social Login
+^^^^^^^^^^^^
+
+Unified provider flow is implemented in social_auth with provider-specific
+validation and a shared local user/token creation path.
+
+Common social request payload:
+
+.. code-block:: json
+
+    {
+      "token": "provider_token",
+      "client_id": "oauth_application_client_id",
+      "client_secret": "oauth_application_client_secret"
+    }
+
+Provider-specific notes:
+
+- Google: validates ID token against GOOGLE_CLIENT_ID.
+- Apple: verifies JWT signature against Apple JWKs and validates audience with APPLE_CLIENT_ID.
+- Facebook: validates via Graph API /me.
+- Microsoft: validates via Microsoft Graph /me.
+- GitHub: validates via /user and /user/emails.
+
+Compatibility note:
+
+- /loginWithGoogle/ remains available from legacy module for existing clients.
+- /loginWithGoogleSocial/ is the recommended new endpoint.
+
+Authorization and Project Permissions
+-------------------------------------
+
+Permission Model
+^^^^^^^^^^^^^^^^
+
+NETS CORE includes first-class authorization entities:
+
+- Permission(codename)
+- Role
+- RolePermission
+- UserRole
+
+Additionally, role assignments can be project-scoped through generic relation
+fields (project_content_type/project_id).
+
+Enable Project-Aware Authorization
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Set these settings to enable project and membership resolution in handlers:
+
+.. code-block:: python
+
+    NETS_CORE_PROJECT_MODEL = "myapp.MyProject"
+    NETS_CORE_PROJECT_MEMBER_MODEL = "myapp.MyProjectMember"
+
+Recommended model pattern:
+
+.. code-block:: python
+
+    from django.db import models
+    from nets_core.models import OwnedModel
+
+    class MyProject(OwnedModel):
+        name = models.CharField(max_length=255)
+        enabled = models.BooleanField(default=True)
+        description = models.TextField(blank=True, null=True)
+
+        JSON_DATA_FIELDS = ("id", "name", "enabled", "description", "created", "updated")
+        PROTECTED_FIELDS = ["user"]
+
+        def __str__(self):
+            return self.name
+
+
+    class MyProjectMember(OwnedModel):
+        project = models.ForeignKey(MyProject, on_delete=models.CASCADE)
+        enabled = models.BooleanField(default=True)
+        is_superuser = models.BooleanField(default=False)
+
+        # Optional: role attribute used by your own access logic.
+        # You can use either your custom field or relate to nets_core Role.
+        role = models.CharField(max_length=50, default="member")
+
+        JSON_DATA_FIELDS = ("id", "project_id", "user_id", "enabled", "is_superuser", "role")
+        PROTECTED_FIELDS = ["project", "is_superuser"]
+
+        def __str__(self):
+            return f"{self.user} - {self.project}"
+
+Using Permissions in Endpoints
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use request_handler can_do and perm_required to gate access:
 
 .. code-block:: python
 
@@ -190,44 +369,98 @@ Example:
     from nets_core.params import RequestParam
 
     @request_handler(
-        params=[
-            RequestParam("name", str),
-            RequestParam("age", int, optional=True, default=18),
-        ],
-        public=False,
-        can_do="myapp.can_change_profile",
-        perm_required=False,
+        params=[RequestParam("project_id", int)],
+        can_do="myapp.can_change_project",
+        perm_required=True,
+        project_required=True,
     )
-    def my_view(request):
-        return JsonResponse({"ok": True, "name": request.params.name})
+    def update_project(request):
+        return JsonResponse({"res": 1})
 
-Behavior summary:
+Notes:
 
-- Parses params from JSON body, form body, querystring, and files.
-- Casts values to declared types.
-- Returns 400 with standardized error payload on invalid input.
-- Optionally checks permissions/roles and object ownership.
+- If permission codename does not exist, NETS CORE can create it and deny the first call.
+- project_id in request payload is used to resolve project context.
+- Ownership checks apply when object-based handlers are used.
 
-RequestParam Supported Types
-----------------------------
+Utility helpers in security module:
 
-- Python types: str, int, bool, float, dict, list.
+- get_or_create_project_role
+- get_or_create_project_role_permission
+- add_user_to_role
+
+Model Extension and Serialization
+---------------------------------
+
+NetsCoreBaseModel
+^^^^^^^^^^^^^^^^^
+
+Provides:
+
+- created and updated timestamps.
+- updated_fields JSON history.
+- to_json(fields=...) serialization helper.
+
+OwnedModel
+^^^^^^^^^^
+
+Extends NetsCoreBaseModel and adds:
+
+- user ForeignKey ownership.
+
+Defining JSON output
+^^^^^^^^^^^^^^^^^^^^
+
+You should define JSON_DATA_FIELDS in your models to make to_json() predictable.
+
+.. code-block:: python
+
+    class Invoice(OwnedModel):
+        total = models.DecimalField(max_digits=10, decimal_places=2)
+        JSON_DATA_FIELDS = ("id", "user_id", "total", "created")
+
+Protecting sensitive fields
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- Model-level: PROTECTED_FIELDS in each model.
+- Global-level: NETS_CORE_PROTECTED_FIELDS setting.
+
+Authentication endpoints also honor NETS_CORE_USER_PROHIBITED_FIELDS for user
+profile updates.
+
+request_handler and RequestParam
+--------------------------------
+
+request_handler features:
+
+- csrf_exempt wrapping.
+- Authentication/public checks.
+- Parameter parsing and type casting.
+- Optional permission checks.
+- Optional object lookup with owner-aware access controls.
+- project/project_membership resolution via project_id.
+
+RequestParam supports:
+
+- Python types: str, int, bool, float, list, dict.
 - Named types: date, datetime, email, file.
-- Custom validators through validate callable.
+- Optional defaults and custom validate callbacks.
 
-Core Models
------------
+Example:
 
-- NetsCoreBaseModel: created/updated/updated_fields + to_json.
-- OwnedModel: base model + user ownership.
-- VerificationCode: OTP lifecycle.
-- UserDevice: user device tracking and firebase token storage.
-- Permission, Role, RolePermission, UserRole: authorization graph.
-- EmailTemplate, EmailNotification, CustomEmail: email composition/delivery metadata.
-- UserFirebaseNotification: push delivery tracking.
+.. code-block:: python
 
-Email Integration
------------------
+    from nets_core.params import RequestParam
+
+    params = [
+        RequestParam("title", str),
+        RequestParam("published", bool, optional=True, default=False),
+        RequestParam("publish_at", "datetime", optional=True),
+        RequestParam("cover", "file", optional=True),
+    ]
+
+Email Service
+-------------
 
 Entry point:
 
@@ -235,107 +468,210 @@ Entry point:
 
     from nets_core.mail import send_email
 
+Signature:
+
+- subject
+- email (str or list)
+- template (path) or html
+- context
+- txt_template (optional)
+- to_queued (default True)
+- force (default False)
+- attachments/files (optional)
+
 Example:
 
 .. code-block:: python
 
     sent, reason, description = send_email(
-        subject="Welcome",
+        subject="Verification",
         email=["user@example.com"],
-        template="myapp/email/welcome.html",
-        context={"name": "Ada"},
-        txt_template="myapp/email/welcome.txt",
+        template="nets_core/email/verification_code.html",
+        context={"button_link": {"label": "123456", "url": ""}},
         to_queued=False,
     )
 
-Highlights:
+Common reason codes:
 
-- Domain exclusion via NETS_CORE_EMAIL_EXCLUDE_DOMAINS.
-- Footer branding via NETS_CORE_EMAIL_FOOTER / NETS_CORE_EMAIL_FOOTER_TEMPLATE.
-- Debug guard via NETS_CORE_EMAIL_DEBUG_ENABLED.
-- Attachment normalization and validation.
+- invalid_email
+- email_domain_excluded
+- empty_email
+- template_not_found
+- template_syntax_error
+- template_or_html_required
+- email_not_sent
+- email_sent
+- email_in_queue
+- email_disabled
+- invalid_attachment
+
+Email behavior notes:
+
+- If DEBUG=True and NETS_CORE_EMAIL_DEBUG_ENABLED=False, emails are skipped unless force=True.
+- Excluded domains are controlled by NETS_CORE_EMAIL_EXCLUDE_DOMAINS.
+- Footer is controlled by NETS_CORE_EMAIL_FOOTER, NETS_CORE_EMAIL_FOOTER_TEMPLATE, NETS_CORE_EMAIL_FOOTER_ENABLED.
+- When attachments are present, queued mode is automatically downgraded to immediate send.
+
+Wildcard exclusion examples:
+
+.. code-block:: python
+
+    NETS_CORE_EMAIL_EXCLUDE_DOMAINS = [
+        "mailinator*",   # blocks mailinator.com, mailinator.org, etc.
+        "temp-mail.org",
+    ]
 
 Push Notifications
 ------------------
 
-Firebase integration is available through nets_core.firebase_messages.
-
-Minimal requirement:
+Firebase setup:
 
 .. code-block:: python
 
     FIREBASE_CONFIG = "/absolute/path/to/firebase-service-account.json"
 
-Then send notifications to active user devices through internal helpers/tasks.
+Capabilities:
 
-Selected Settings Reference
----------------------------
+- Send single device message with data payload.
+- Send user fan-out notifications to active devices.
+- Persist notification delivery result/error in UserFirebaseNotification.
 
-Auth and Verification
-^^^^^^^^^^^^^^^^^^^^^
+Background Tasks
+----------------
 
-- NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS
-- NETS_CORE_DEBUG_VERIFICATION_CODE
-- NETS_CORE_VERIFICATION_CODE_CACHE_KEY
+Available Celery tasks include:
+
+- send_user_devices_notifications
+- check_permissions
+- get_google_avatar
+
+For production, configure broker/backend and workers.
+
+Channels Middleware
+-------------------
+
+AuthTokenMiddleware integrates OAuth2 Bearer token lookup into Django Channels
+scope user resolution.
+
+Recommended middleware stack usage:
+
+.. code-block:: python
+
+    from nets_core.middleware.auth_token import AuthTokenMiddlewareStack
+
+    application = ProtocolTypeRouter({
+        "websocket": AuthTokenMiddlewareStack(URLRouter(websocket_urlpatterns))
+    })
+
+Settings Reference (Exhaustive)
+-------------------------------
+
+Core auth and token settings:
+
+- AUTHENTICATION_BACKENDS
 - ACCESS_TOKEN_EXPIRE_SECONDS
+- NETS_CORE_VERIFICATION_CODE_EXPIRE_SECONDS
+- NETS_CORE_VERIFICATION_CODE_CACHE_KEY
+- NETS_CORE_DEBUG_VERIFICATION_CODE
 
-Email
-^^^^^
+Verification code behavior:
 
+- Default debug code is 123456 when DEBUG=True.
+- You can override with NETS_CORE_DEBUG_VERIFICATION_CODE.
+
+Social settings:
+
+- GOOGLE_CLIENT_ID
+- APPLE_CLIENT_ID
+
+Email settings:
+
+- DEFAULT_FROM_EMAIL
 - NETS_CORE_EMAIL_DEBUG_ENABLED
 - NETS_CORE_EMAIL_EXCLUDE_DOMAINS
 - NETS_CORE_EMAIL_FOOTER_ENABLED
 - NETS_CORE_EMAIL_FOOTER
 - NETS_CORE_EMAIL_FOOTER_TEMPLATE
 
-Project and Permissions
-^^^^^^^^^^^^^^^^^^^^^^^
+Project/permission settings:
 
 - NETS_CORE_PROJECT_MODEL
 - NETS_CORE_PROJECT_MEMBER_MODEL
 - NETS_CORE_PROTECTED_FIELDS
 - NETS_CORE_USER_PROHIBITED_FIELDS
 
-Infrastructure
-^^^^^^^^^^^^^^
+Tester shortcuts:
+
+- NETS_CORE_TESTERS_EMAILS
+- NETS_CORE_TESTERS_VERIFICATION_CODE
+
+Tester example:
+
+.. code-block:: python
+
+    NETS_CORE_TESTERS_EMAILS = [
+        "google_tester*",
+        "qa.user@yourcompany.com",
+    ]
+    NETS_CORE_TESTERS_VERIFICATION_CODE = "475638"
+
+Notes:
+
+- A value ending in * behaves as a prefix matcher.
+- Keep tester values unique per environment.
+
+UI template setting:
+
+- NETS_CORE_DELETE_ACCOUNT_TEMPLATE
+
+Delete account template example:
+
+.. code-block:: python
+
+    NETS_CORE_DELETE_ACCOUNT_TEMPLATE = "myapp/account_deletion_info.html"
+
+User profile update guard:
+
+- NETS_CORE_USER_PROHIBITED_FIELDS can extend blocked fields for /update/.
+- Typical blocked fields include password, is_superuser, is_staff,
+  user_permissions, and security metadata.
+
+Infra settings commonly required:
 
 - CACHES
-- CELERY_BROKER_URL / CELERY_RESULT_BACKEND
+- CELERY_BROKER_URL
+- CELERY_RESULT_BACKEND
+- CELERY_ACCEPT_CONTENT
+- CELERY_RESULT_SERIALIZER
+- CELERY_TASK_SERIALIZER
 - CHANNEL_LAYERS
-- AUTHENTICATION_BACKENDS
+- ASGI_APPLICATION
+- CORS_* settings according to your deployment policy
 
-Operational Notes
------------------
+Operational Recommendations
+---------------------------
 
-- Configure cache before enabling OTP in production.
-- Configure Celery/Redis if you rely on queued jobs.
-- Ensure oauth2_provider Application records exist for your client apps.
-- Set NETS_CORE_EMAIL_FOOTER explicitly in production to avoid default placeholder footer.
+- Keep OAuth2 Application records per client app and rotate client secrets.
+- Set strict CORS/CSRF policies in production.
+- Use Redis or Memcached for cache reliability.
+- Monitor Celery queues and retry behavior.
+- Configure NETS_CORE_EMAIL_FOOTER explicitly to avoid placeholder content.
+- Use distinct tester settings per environment if enabled.
 
-Management Command
-------------------
+Security Notes
+--------------
 
-Inspect and optionally scaffold baseline settings:
-
-.. code-block:: bash
-
-    python manage.py nets-settings
-    python manage.py nets-settings --create
-    python manage.py nets-settings --create --force
+- Never trust raw provider tokens without server-side verification.
+- Keep FIREBASE_CONFIG and OAuth credentials in secure secret storage.
+- Treat NETS_CORE_TESTERS_* as high-risk settings and disable in production unless strictly needed.
 
 Additional Documentation
 ------------------------
 
-For architecture and implementation patterns, see:
-
 - docs/USAGE_GUIDE.rst
-
-Contributing
-------------
-
-- Read CONTRIBUTING.md
-- Read SECURITY.md for vulnerability reporting
-- Follow CODE_OF_CONDUCT.md
+- CONTRIBUTING.md
+- SECURITY.md
+- CODE_OF_CONDUCT.md
 
 License
 -------
