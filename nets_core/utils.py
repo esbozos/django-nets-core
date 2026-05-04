@@ -1,4 +1,6 @@
 import calendar
+import logging
+import os
 import time
 import uuid
 import re
@@ -12,8 +14,30 @@ import pytz
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 
+logger = logging.getLogger(__name__)
+
 
 def local_datetime(s: str, tz: str = settings.TIME_ZONE) -> datetime:
+    """
+    Parse an ISO-8601 datetime string and attach a timezone.
+
+    Parameters
+    ----------
+    s:
+        Naive ISO-8601 string, e.g. ``"2026-05-04T10:30:00"``.
+    tz:
+        IANA timezone name.  Defaults to ``settings.TIME_ZONE``.
+
+    Returns
+    -------
+    datetime
+        Timezone-aware datetime.
+
+    Raises
+    ------
+    ValueError
+        If *s* cannot be parsed as a datetime.
+    """
     naive = parse_datetime(s)
     if not naive:
         raise ValueError("local_datetime: Not a valid datetime")
@@ -22,6 +46,19 @@ def local_datetime(s: str, tz: str = settings.TIME_ZONE) -> datetime:
 
 
 def get_client_ip(request):
+    """
+    Extract the originating client IP address from *request*.
+
+    Inspects a prioritised list of HTTP headers (``X-Forwarded-For``,
+    ``X-Real-IP``, etc.) before falling back to ``REMOTE_ADDR``.  When
+    multiple IPs are present in a comma-separated header (proxy chain), the
+    **first** (leftmost) value is returned as per RFC 7239 convention.
+
+    .. note::
+        Only trust forwarded headers if your infrastructure guarantees they
+        are set by a trusted reverse proxy.  In other deployments, consider
+        using only ``REMOTE_ADDR``.
+    """
     META_PRECEDENCE_ORDER = (
         "HTTP_X_FORWARDED_FOR",
         "X_FORWARDED_FOR",  # <client>, <proxy1>, <proxy2>
@@ -58,12 +95,52 @@ def generate_int_uuid(size=None):
 
 
 def get_upload_path(instance, filename):
+    """
+    Build a structured media upload path for a model ``FileField`` or
+    ``ImageField``.
+
+    The resulting path follows the pattern::
+
+        <model_name>/<YYYY>/<MM>/<DD>/<filename>
+
+    When the instance has a ``project`` attribute, the path is further
+    namespaced::
+
+        PSMDOC_PROJ_<project_id>/<model_name>/<YYYY>/<MM>/<DD>/<filename>
+
+    This keeps uploaded files automatically organised by model and date,
+    without any extra configuration per field.
+
+    Example usage in a model
+    ------------------------
+    .. code-block:: python
+
+        from nets_core.utils import get_upload_path
+
+        class Invoice(OwnedModel):
+            attachment = models.FileField(upload_to=get_upload_path)
+
+    Parameters
+    ----------
+    instance:
+        The model instance the file is being attached to.
+    filename:
+        Original filename supplied by the client.  The basename is extracted
+        to prevent path-traversal attacks.
+
+    Returns
+    -------
+    str
+        Relative upload path.
+    """
+    # Strip any leading path components to prevent path-traversal.
+    filename = os.path.basename(filename)
     folder = instance._meta.model_name
     path = ""
     if instance and hasattr(instance, "project"):
         path = f"PSMDOC_PROJ_{instance.project.id}/"
 
-    path += "{}".format(folder) if folder.endswith("/") else "{}/".format(folder)
+    path += "{}" .format(folder) if folder.endswith("/") else "{}/".format(folder)
 
     today = timezone.now()
     date_path = today.strftime("%Y/%m/%d/")
@@ -73,6 +150,44 @@ def get_upload_path(instance, filename):
 
 
 def check_perm(user, action, project=None):
+    """
+    Check whether *user* holds a named permission, optionally within a project.
+
+    Global permissions
+    ------------------
+    When *project* is ``None``, the function inspects all enabled
+    :class:`~nets_core.models.UserRole` records for *user* and returns
+    ``True`` if any attached :class:`~nets_core.models.Permission` matches
+    *action*.
+
+    Project-scoped permissions
+    --------------------------
+    When *project* is provided:
+
+    1. Resolves the membership record from
+       ``settings.NETS_CORE_PROJECT_MEMBER_MODEL``.
+    2. Returns ``False`` if the member is disabled.
+    3. Returns ``True`` immediately for project super-users.
+    4. If *action* starts with ``"role:"`` (e.g. ``"role:admin"``), compares
+       the member's ``role`` attribute directly.
+    5. Otherwise, evaluates the user's project-scoped roles against
+       :class:`~nets_core.models.RolePermission` records.
+
+    Parameters
+    ----------
+    user:
+        Instance of ``settings.AUTH_USER_MODEL``.
+    action:
+        Permission codename, e.g. ``"can_publish"``, or a role shorthand
+        like ``"role:admin"``.
+    project:
+        Optional project instance.  Must match
+        ``settings.NETS_CORE_PROJECT_MODEL``.
+
+    Returns
+    -------
+    bool
+    """
     from nets_core.models import Permission, RolePermission
 
     project_content_type = None
@@ -110,7 +225,7 @@ def check_perm(user, action, project=None):
                 
             except project_member_model.DoesNotExist:
                 return False
-        except:
+        except Exception:
             raise Exception(
                 "check_perm failed NETS_CORE_PROJECT_MEMBER_MODEL not set in settings"
             )
@@ -134,9 +249,9 @@ def check_perm(user, action, project=None):
         user_perms = []
         for r in user_roles:
             user_perms += r.role.permissions.all()
-        print(f"User: {user}", user_roles, user_perms)
+        logger.debug("check_perm user=%s roles=%s perms=%s", user, list(user_roles), list(user_perms))
         for p in user_perms:
-            print(p.codename)
+            logger.debug("check_perm evaluating codename=%s", p.codename)
             if p.codename == action:
                 return True
 

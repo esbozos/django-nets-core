@@ -30,6 +30,9 @@ username_field = getattr(User, "USERNAME_FIELD", "username")
 
 
 @request_handler(
+    path="loginWithGoogle/",
+    name="loginWithGoogle",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id",  type=str),

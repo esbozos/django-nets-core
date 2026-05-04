@@ -16,6 +16,32 @@ from nets_core.utils import get_client_ip, check_perm
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+
+
+def _normalize_http_methods(methods, method):
+    raw_methods = methods if methods is not None else method
+    if raw_methods is None:
+        return None
+
+    if isinstance(raw_methods, str):
+        raw_methods = [raw_methods]
+
+    normalized = []
+    seen = set()
+    for m in raw_methods:
+        upper = str(m).upper().strip()
+        if upper not in ALLOWED_HTTP_METHODS:
+            raise ValueError(f"Invalid HTTP method '{m}' in request_handler")
+        if upper not in seen:
+            seen.add(upper)
+            normalized.append(upper)
+
+    if not normalized:
+        raise ValueError("request_handler methods cannot be empty")
+
+    return tuple(normalized)
+
 def request_handler(
     obj=None, 
     can_do: str|list[str]=None, 
@@ -25,7 +51,12 @@ def request_handler(
     allow_anonymous=False, 
     public=False,
     project_required=False,
-    index_field: str = 'id'):
+    index_field: str = 'id',
+    path: str|None = None,
+    url: str|None = None,
+    name: str|None = None,
+    methods: str|list[str]|None = None,
+    method: str|None = None):
     """
         Decorator for request params handler
         check if customer is required, permissions and obj
@@ -41,12 +72,25 @@ def request_handler(
         customer_required: if True, check if customer_id is present in request
             and retrieve customer from db append to request object
         index_field: field to use as index for obj
+        path/url: route path used to auto-build urlpatterns
+        name: route name used to auto-build urlpatterns
+        methods/method: optional allowed HTTP method(s), returns 405 if not allowed
     """
+
+    if path and url and path != url:
+        raise ValueError("request_handler received both 'path' and 'url' with different values")
+
+    route_path = path or url
+    allowed_http_methods = _normalize_http_methods(methods, method)
 
     def decorator(view_func):
         @csrf_exempt
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
+            if allowed_http_methods and request.method not in allowed_http_methods:
+                response = JsonResponse({"res": 0, "message": _("method not allowed")}, status=405)
+                response["Allow"] = ", ".join(allowed_http_methods)
+                return response
             
             if request.user.is_anonymous and not public:
                 return permission_denied()
@@ -149,6 +193,13 @@ def request_handler(
 
             request.ip = get_client_ip(request)
             return view_func(request, *args, **kwargs)
+
+        if route_path:
+            _wrapped_view.__nets_core_route__ = {
+                "path": route_path,
+                "name": name or view_func.__name__,
+                "methods": allowed_http_methods,
+            }
         
         return _wrapped_view
     return decorator

@@ -1,34 +1,43 @@
 import hmac
 import hashlib
+import logging
 from django.apps import apps
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.contrib.auth.hashers import check_password, make_password
-from base64 import b64decode, b64encode
 from oauthlib import common
 from oauth2_provider.models import Application, AccessToken, RefreshToken
+
+logger = logging.getLogger(__name__)
 
 # TODO: create middleware to restring token_access with device_uuid
 
 
 def validate_verification_code(user, code: str) -> bool:
     """
-    Validate verification code for user
-    Parameters:
-    user (instance): Instance of settings.AUTH_MODEL_MODEL
-    code (str): Verification code
+    Validate a one-time verification code for *user* without consuming it.
 
-    Returns:
-    bool: True if code is valid, False otherwise
+    Delegates actual validation to ``VerificationCode.validate()``, which
+    checks expiration and attempt limits.
 
+    Parameters
+    ----------
+    user:
+        Instance of ``settings.AUTH_USER_MODEL``.
+    code:
+        The raw OTP string entered by the user.
+
+    Returns
+    -------
+    bool
+        ``True`` if the code is valid and not expired; ``False`` otherwise.
     """
     try:
         from nets_core.models import VerificationCode
-    except:
-        raise Exception(_("nets_core.models not found"))
+    except Exception as exc:
+        raise Exception(_("nets_core.models not found")) from exc
     vcode = VerificationCode.objects.filter(user=user).last()
     if not vcode:
         return False
@@ -64,15 +73,17 @@ def authenticate(
 
     try:
         from nets_core.models import VerificationCode
-    except:
-        raise Exception(_("nets_core.models not found"))
-    
+    except Exception as exc:
+        raise Exception(_("nets_core.models not found")) from exc
+
     try:
         oauth_app = Application.objects.get(client_id=client_id)
-        if not oauth_app.client_secret == client_secret:
-            raise Exception(_("Invalid client_secret"))
     except Application.DoesNotExist:
         raise Exception(_("Invalid client_id"))
+
+    # Constant-time comparison to prevent timing-based secret enumeration.
+    if not hmac.compare_digest(oauth_app.client_secret, client_secret):
+        raise Exception(_("Invalid client_secret"))
 
     vcode = VerificationCode.objects.filter(user=user).order_by("-created").first()
     if not vcode:
@@ -101,28 +112,38 @@ def authenticate(
 
 def get_expiration_time():
     """
-    Get expiration time in seconds from settings.ACCESS_TOKEN_EXPIRE_SECONDS
-    or return 60 * 60 * 24 * 30 (30 days as default)
+    Compute the OAuth2 access-token expiration datetime.
+
+    Reads ``settings.ACCESS_TOKEN_EXPIRE_SECONDS`` when available;
+    defaults to **30 days** (``60 * 60 * 24 * 30``).
+
+    Returns
+    -------
+    datetime
+        Timezone-aware expiration datetime.
     """
-    expire_seconds = 60 * 60 * 24 * 30  # 30 days as default
-    try:
-        expire_seconds = settings.ACCESS_TOKEN_EXPIRE_SECONDS
-    except:
-        pass
-    
+    expire_seconds = 60 * 60 * 24 * 30  # 30 days default
+    expire_seconds = getattr(settings, "ACCESS_TOKEN_EXPIRE_SECONDS", expire_seconds)
     return timezone.now() + timezone.timedelta(seconds=expire_seconds)
 
 def generate_tokens(user, oauth_app, expires=None):
     """
-    Generate access and refresh tokens for user
-    Parameters:
-    user (instance): Instance of settings.AUTH_MODEL_MODEL
-    oauth_app (instance): Instance of oauth2_provider.models.Application
-    expires (datetime): Expiration date for access token
-    
-    Returns:
-    dict: {"access_token": str, "refresh_token": str, "token_expires": datetime }
+    Create a new OAuth2 ``AccessToken`` / ``RefreshToken`` pair for *user*.
 
+    Parameters
+    ----------
+    user:
+        Instance of ``settings.AUTH_USER_MODEL``.
+    oauth_app:
+        ``oauth2_provider.models.Application`` the tokens are issued for.
+    expires:
+        Optional timezone-aware expiration datetime.  When omitted,
+        :func:`get_expiration_time` is used.
+
+    Returns
+    -------
+    dict
+        ``{"access_token": str, "refresh_token": str, "token_expire": datetime}``
     """
     if not expires:
         expires = get_expiration_time()
@@ -150,35 +171,44 @@ def generate_tokens(user, oauth_app, expires=None):
 
 def get_or_create_project_role(project, role_name):
     """
-    Create a role for project to provide multi project support
-    Parameters:
-    project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
-    role_name (str): Role name
+    Return (or create) a :class:`~nets_core.models.Role` scoped to *project*.
 
-    Returns:
-    instance: nets_core.models.Role
+    Role names are automatically suffixed with ``_{project.id}`` to keep them
+    unique across projects of the same type.
 
+    Parameters
+    ----------
+    project:
+        Instance of the model declared in ``settings.NETS_CORE_PROJECT_MODEL``.
+    role_name:
+        Human-readable role identifier, e.g. ``"admin"`` or ``"viewer"``.
+
+    Returns
+    -------
+    tuple[Role, bool]
+        The role instance and a boolean indicating whether it was created.
+
+    Raises
+    ------
+    Exception
+        If the project instance type does not match
+        ``settings.NETS_CORE_PROJECT_MODEL`` or the model cannot be resolved.
     """
     try:
         from nets_core.models import Role
+    except Exception as exc:
+        raise Exception(_("nets_core.models not found")) from exc
 
-    except:
-        raise Exception(_("nets_core.models not found"))
-    
     try:
         project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
-        if not isinstance(project, project_model):
-            raise Exception(
-                _(
-                    "Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"
-                )
-            )
-
-    except project_model.DoesNotExist:
+    except LookupError as exc:
         raise Exception(
-            _(
-                "Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"
-            )
+            _("Could not resolve NETS_CORE_PROJECT_MODEL: %s") % settings.NETS_CORE_PROJECT_MODEL
+        ) from exc
+
+    if not isinstance(project, project_model):
+        raise Exception(
+            _("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL")
         )
 
     content_type = ContentType.objects.get_for_model(project)
@@ -195,20 +225,35 @@ def get_or_create_project_role_permission(
     project, role_name, codename, verbose_name: str = None, description: str = ""
 ):
     """
-    Create a role for project to provide multi project support
-    Parameters:
-    project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
-    role_name (str): Role name
-    codename (str): Permission codename
+    Ensure a :class:`~nets_core.models.Permission` exists and is attached to a
+    project-scoped role.
 
-    Returns:
-    instance: nets_core.models.Role
+    Creates the role (via :func:`get_or_create_project_role`) and the permission
+    if they do not already exist, then links the permission to the role.
 
+    Parameters
+    ----------
+    project:
+        Instance of the model declared in ``settings.NETS_CORE_PROJECT_MODEL``.
+    role_name:
+        Role identifier (see :func:`get_or_create_project_role`).
+    codename:
+        Unique machine-readable permission string, e.g. ``"can_publish"``.
+    verbose_name:
+        Human-readable permission name.  Defaults to a titlecased version of
+        *codename*.
+    description:
+        Optional longer description stored on the Permission record.
+
+    Returns
+    -------
+    tuple[Permission, bool]
+        The permission instance and a boolean indicating whether it was created.
     """
     try:
         from nets_core.models import Permission
-    except:
-        raise Exception(_("nets_core.models not found"))
+    except Exception as exc:
+        raise Exception(_("nets_core.models not found")) from exc
     role, _role_created = get_or_create_project_role(project, role_name)
     content_type = ContentType.objects.get_for_model(project)
     if not verbose_name:
@@ -223,43 +268,56 @@ def get_or_create_project_role_permission(
 
 def add_user_to_role(user, project, role_name):
     """
-    Add role to user in project
-    Parameters:
-    user (instance): User instance. Should be the same as settings.AUTH_USER_MODEL
-    project (instance): Project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL
-    role_name (str): Role name
+    Assign *user* to a project-scoped role, creating the role if needed.
 
-    Returns:
-    instance: nets_core.models.Role
+    Parameters
+    ----------
+    user:
+        Instance of ``settings.AUTH_USER_MODEL``.
+    project:
+        Instance of the model declared in ``settings.NETS_CORE_PROJECT_MODEL``.
+    role_name:
+        Role identifier (see :func:`get_or_create_project_role`).
 
+    Returns
+    -------
+    tuple[UserRole, bool]
+        The ``UserRole`` join record and a boolean indicating whether it was
+        created.
+
+    Raises
+    ------
+    Exception
+        If either model instance does not match the configured model types, or
+        if the model labels cannot be resolved.
     """
     try:
         from nets_core.models import UserRole
-    except:
-        raise Exception(_("nets_core.models not found"))
-    
+    except Exception as exc:
+        raise Exception(_("nets_core.models not found")) from exc
+
     try:
         project_model = apps.get_model(settings.NETS_CORE_PROJECT_MODEL)
-        if not isinstance(project, project_model):
-            raise Exception(
-                _(
-                    "Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"
-                )
-            )
-
-        user_model = apps.get_model(settings.AUTH_USER_MODEL)
-        if not isinstance(user, user_model):
-            raise Exception(
-                _(
-                    "Invalid user instance. Should be the same as settings.AUTH_USER_MODEL"
-                )
-            )
-
-    except project_model.DoesNotExist:
+    except LookupError as exc:
         raise Exception(
-            _(
-                "Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL"
-            )
+            _("Could not resolve NETS_CORE_PROJECT_MODEL: %s") % settings.NETS_CORE_PROJECT_MODEL
+        ) from exc
+
+    if not isinstance(project, project_model):
+        raise Exception(
+            _("Invalid project instance. Should be the same as settings.NETS_CORE_PROJECT_MODEL")
+        )
+
+    try:
+        user_model = apps.get_model(settings.AUTH_USER_MODEL)
+    except LookupError as exc:
+        raise Exception(
+            _("Could not resolve AUTH_USER_MODEL: %s") % settings.AUTH_USER_MODEL
+        ) from exc
+
+    if not isinstance(user, user_model):
+        raise Exception(
+            _("Invalid user instance. Should be the same as settings.AUTH_USER_MODEL")
         )
 
     role, _role_created = get_or_create_project_role(project, role_name)
@@ -276,17 +334,35 @@ def add_user_to_role(user, project, role_name):
 
 class SecureCache:
     """
-    Secure cache to store and retrieve data with expiration time.
-    This cache is secure because it uses the same key to store and retrieve data.
-    It uses the same key to store and retrieve data.
-    This cache
-    Parameters:
-    key (str): Key to store and retrieve data
-    expiration (int): Time in seconds to expire data
+    HMAC-backed cache wrapper for storing and validating short-lived secrets.
 
-    Returns:
-    instance: SecureCache
+    Both keys and values are hashed with HMAC-SHA256 before they reach the
+    cache backend.  This means:
 
+    * The raw key is never stored — a compromised cache server cannot enumerate
+      what logical keys exist.
+    * The raw value is never stored — you cannot retrieve the original string,
+      only verify it with :meth:`validate`.
+    * Cache poisoning is mitigated: injecting an arbitrary value cannot pass
+      validation without knowing ``SECRET_KEY`` (or
+      ``NETS_CORE_SECURE_CACHE_KEY``).
+
+    The HMAC secret is read from ``settings.NETS_CORE_SECURE_CACHE_KEY`` when
+    present, falling back to Django's ``settings.SECRET_KEY``.
+
+    Typical usage
+    -------------
+    .. code-block:: python
+
+        sc = SecureCache()
+
+        # Store a one-time token for 5 minutes:
+        sc.set("password_reset:user_42", raw_token, expiration=300)
+
+        # Later, verify the token submitted by the user:
+        if sc.validate("password_reset:user_42", submitted_token):
+            sc.delete("password_reset:user_42")
+            # proceed with reset
     """
 
     def __init__(self):
@@ -294,29 +370,28 @@ class SecureCache:
         self.expiration = 0
 
     def secure_key(self, key: str) -> str:
+        """Return the HMAC-SHA256 digest of *key*, prefixed and length-capped."""
         key_prefix = "NETS_SK_"
-        # use settings.NETS_CORE_SECURE_CACHE_KEY or settings.SECRET_KEY as secret key
         secret_key = getattr(
             settings, "NETS_CORE_SECURE_CACHE_KEY", settings.SECRET_KEY
         )
-        key = hmac.new(
+        digest = hmac.new(
             secret_key.encode("utf-8"), key.encode("utf-8"), hashlib.sha256
         ).hexdigest()
 
-        k = f"{key_prefix}{key}"
+        k = f"{key_prefix}{digest}"
         if len(k) > 250:
             k = k[:250]
         return k
 
-    def secure_value(self, value: str) -> str: 
-        # use settings.NETS_CORE_SECURE_CACHE_KEY or settings.SECRET_KEY as secret key
+    def secure_value(self, value: str) -> str:
+        """Return the HMAC-SHA256 digest of *value* (one-way; not reversible)."""
         secret_key = getattr(
             settings, "NETS_CORE_SECURE_CACHE_KEY", settings.SECRET_KEY
         )
-        value = hmac.new(
+        return hmac.new(
             secret_key.encode("utf-8"), value.encode("utf-8"), hashlib.sha256
         ).hexdigest()
-        return value
 
     def set(self, key: str, value: str, expiration: int) -> None:
         self.key = self.secure_key(key)
@@ -325,14 +400,12 @@ class SecureCache:
 
     def get(self, key: str) -> str | None:
         """
-        Get encrypted value from cache
-        No decryption provided. Use secure_value to compare values
-        Parameters:
-        key (str): Key to get value
+        Retrieve the stored HMAC digest for *key*.
 
-        Returns:
-        str: Value or None if not found
+        No decryption is provided — the returned value is already a digest.
+        Use :meth:`validate` to compare an incoming plaintext value against it.
 
+        Returns ``None`` when the key is absent or expired.
         """
         self.key = self.secure_key(key)
         value = cache.get(self.key)

@@ -50,6 +50,9 @@ def valid_gender(s):
 
 @request_handler(
     public=True,
+    path="login/",
+    name="login",
+    method="POST",
     params=[
         RequestParam(username_field, str),
         RequestParam("device", dict, True, default=None),
@@ -174,6 +177,9 @@ def check_email(request):
 @request_handler(
     User,
     index_field=username_field,
+    path="authenticate/",
+    name="authenticate",
+    method="POST",
     params=[
         RequestParam(username_field, str),
         RequestParam("code", int),
@@ -214,7 +220,7 @@ def auth(request):
         return error_response(msg)
 
 
-@request_handler()
+@request_handler(path="logout/", name="logout", method="POST")
 def auth_logout(request):
     params = request.params
     if hasattr(params, "device_uuid"):
@@ -238,6 +244,9 @@ def auth_logout(request):
 
 
 @request_handler(
+    path="getProfile/",
+    name="getProfile",
+    methods=["GET", "POST"],
     params=[
         RequestParam("fields", list, True, default=None),
     ]
@@ -252,7 +261,7 @@ def auth_get_profile(request):
     return success_response(request.user.to_json(fields=fields))
 
 
-@request_handler()
+@request_handler(path="update/", name="update", method="POST")
 def update_user(request):
     user = request.user
     updated_fields = {}
@@ -325,7 +334,7 @@ def update_user(request):
     return success_response(user.to_json())
 
 
-@request_handler(public=True)
+@request_handler(public=True, path="requestDelete/", name="requestDelete", methods=["GET", "POST"])
 def request_delete_user_account(request):
     if not hasattr(settings, "NETS_CORE_DELETE_ACCOUNT_TEMPLATE"):
         info_template = "nets_core/delete_account_info.html"
@@ -344,6 +353,9 @@ def request_delete_user_account(request):
 
 
 @request_handler(
+    path="delete/",
+    name="delete",
+    method="POST",
     params=[RequestParam("sure", bool, default=False), RequestParam("code", str)],
 )
 def delete_user_account(request):

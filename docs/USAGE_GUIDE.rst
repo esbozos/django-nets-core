@@ -52,6 +52,44 @@ request_handler Best Practices
 - Use perm_required=True on sensitive operations that should never fallback to owner-only rules.
 - Use project_required=True in multi-tenant/project-scoped endpoints.
 
+Auto Documentation and OpenAPI
+------------------------------
+
+You can declare endpoint route metadata directly in request_handler and reuse it
+for URL wiring, docs pages, and OpenAPI generation.
+
+Example:
+
+.. code-block:: python
+
+	from django.http import JsonResponse
+	from django.urls import path
+	from nets_core.decorators import request_handler
+	from nets_core.routing import build_openapi_paths, build_route_registry, build_urlpatterns
+
+	@request_handler(path="health/", name="health", methods=["GET"], public=True)
+	def health(request):
+		return JsonResponse({"res": 1, "data": "ok"})
+
+	urlpatterns = [
+		*build_urlpatterns("myapp.views"),
+	]
+
+	route_registry = build_route_registry("myapp.views")
+	openapi_paths = build_openapi_paths("myapp.views", tags=["infra"])
+
+Recommended approach:
+
+- Keep methods explicit on every endpoint.
+- Use build_route_registry to generate internal docs pages/tables.
+- Use build_openapi_paths to populate the paths section in your OpenAPI schema pipeline.
+
+Built-in schema endpoint:
+
+- If you include nets_core.auth_urls, NETS CORE now exposes GET /openapi.json.
+- The response is generated from request_handler route metadata.
+- You can customize title/version/tags/modules with NETS_CORE_OPENAPI_* settings.
+
 Model Serialization Notes
 -------------------------
 

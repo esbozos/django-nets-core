@@ -30,6 +30,7 @@ Core API endpoints are exposed through auth URLs:
 - GET/POST /getProfile/
 - GET/POST /requestDelete/
 - POST /delete/
+- GET /openapi.json
 
 Social login endpoints:
 
@@ -58,7 +59,13 @@ Built-in models:
 Built-in helpers/services:
 
 - request_handler decorator and RequestParam parser.
+- Declarative endpoint routing metadata (path/url + name) for auto URL generation.
+- Optional HTTP method guards (method/methods) with 405 + Allow header.
 - Token generation/authentication helpers.
+- SecureCache: HMAC-backed cache for storing and validating short-lived secrets.
+- ``get_upload_path``: model-aware ``upload_to`` callable for organised file storage.
+- ``check_perm`` / role and permission management helpers.
+- ``get_client_ip``: reverse-proxy-aware IP extraction.
 - Email sending service with queue/immediate modes.
 - Firebase push helpers.
 - Settings bootstrap command.
@@ -439,6 +446,8 @@ request_handler features:
 - Optional permission checks.
 - Optional object lookup with owner-aware access controls.
 - project/project_membership resolution via project_id.
+- Optional declarative route metadata: path (or url) and name.
+- Optional HTTP method guards with method or methods.
 
 RequestParam supports:
 
@@ -458,6 +467,62 @@ Example:
         RequestParam("publish_at", "datetime", optional=True),
         RequestParam("cover", "file", optional=True),
     ]
+
+Declarative routes and method guards:
+
+.. code-block:: python
+
+    from nets_core.decorators import request_handler
+    from nets_core.routing import (
+        build_openapi_paths,
+        build_route_registry,
+        build_urlpatterns,
+    )
+
+    @request_handler(
+        public=True,
+        path="health/",
+        name="health",
+        methods=["GET"],
+    )
+    def health(request):
+        return JsonResponse({"res": 1, "data": "ok"})
+
+    urlpatterns = [
+        *build_urlpatterns("myapp.views"),
+    ]
+
+    # Useful for docs pages or custom tooling
+    route_registry = build_route_registry("myapp.views")
+
+    # Drop-in OpenAPI `paths` object
+    openapi_paths = build_openapi_paths("myapp.views", tags=["auth"])
+
+Notes:
+
+- method is a convenience alias for a single HTTP verb.
+- methods accepts one or many verbs (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS).
+- If a method is not allowed, request_handler returns 405 and sets the Allow header.
+- build_route_registry returns normalized route metadata (path, name, methods, module, view_name).
+- build_openapi_paths returns a valid OpenAPI paths mapping you can merge into your schema builder.
+
+Built-in OpenAPI endpoint:
+
+- GET /openapi.json (public)
+
+Optional OpenAPI settings:
+
+.. code-block:: python
+
+    NETS_CORE_OPENAPI_TITLE = "My API"
+    NETS_CORE_OPENAPI_VERSION = "2.1.0"
+    NETS_CORE_OPENAPI_DESCRIPTION = "Public API schema"
+    NETS_CORE_OPENAPI_TAGS = ["auth", "users"]
+    NETS_CORE_OPENAPI_MODULES = (
+        "nets_core.google_auth",
+        "nets_core.social_auth",
+        "nets_core.views",
+    )
 
 Email Service
 -------------
@@ -535,6 +600,105 @@ Capabilities:
 - Send single device message with data payload.
 - Send user fan-out notifications to active devices.
 - Persist notification delivery result/error in UserFirebaseNotification.
+
+Security Utilities
+------------------
+
+SecureCache
+^^^^^^^^^^^
+
+``SecureCache`` is an HMAC-SHA256-backed cache wrapper that stores only
+one-way digests — never the original key or value.  This makes it safe to use
+for short-lived secrets such as password-reset tokens, email confirmation
+codes, or any value where you need to verify correctness without the risk of
+leaking the original from a compromised cache server.
+
+How it works:
+
+- **Keys** are hashed with HMAC-SHA256 before hitting the cache backend.
+  A full cache dump cannot reveal what logical keys exist.
+- **Values** are also stored as HMAC digests.  There is no way to decrypt
+  them; you can only *validate* an incoming plaintext against the stored
+  digest via ``validate()``.
+- The HMAC secret is read from ``settings.NETS_CORE_SECURE_CACHE_KEY`` when
+  set, otherwise falls back to Django's ``settings.SECRET_KEY``.
+
+Recommended additional setting:
+
+.. code-block:: python
+
+    NETS_CORE_SECURE_CACHE_KEY = "a-long-random-string-different-from-SECRET_KEY"
+
+Usage example:
+
+.. code-block:: python
+
+    from nets_core.security import SecureCache
+
+    sc = SecureCache()
+
+    # Store a one-time token for 5 minutes (300 seconds).
+    sc.set("password_reset:user_42", raw_token, expiration=300)
+
+    # Verify the token submitted by the user (constant-time comparison).
+    if sc.validate("password_reset:user_42", submitted_token):
+        sc.delete("password_reset:user_42")
+        # proceed with the reset flow
+
+Other security helpers:
+
+- ``generate_tokens(user, oauth_app, expires=None)`` — create an
+  ``AccessToken`` / ``RefreshToken`` pair directly without going through the
+  OTP flow. Useful for service-to-service or testing scenarios.
+- ``get_or_create_project_role(project, role_name)`` — ensure a
+  project-scoped role exists.
+- ``get_or_create_project_role_permission(project, role_name, codename)`` —
+  ensure a permission is attached to a project role.
+- ``add_user_to_role(user, project, role_name)`` — assign a user to a
+  project-scoped role.
+
+All authentication helpers use ``hmac.compare_digest`` for secret comparisons
+to eliminate timing-attack surface.
+
+Utility Helpers
+---------------
+
+get_upload_path
+^^^^^^^^^^^^^^^
+
+A ready-made ``upload_to`` callable for ``FileField`` / ``ImageField`` that
+organises files by model name and upload date automatically:
+
+.. code-block:: python
+
+    from nets_core.utils import get_upload_path
+
+    class Invoice(OwnedModel):
+        attachment = models.FileField(upload_to=get_upload_path)
+        cover      = models.ImageField(upload_to=get_upload_path, blank=True)
+
+The resulting path follows the pattern::
+
+    <model_name>/<YYYY>/<MM>/<DD>/<filename>
+
+When the model instance has a ``project`` attribute the namespace is expanded::
+
+    PSMDOC_PROJ_<project_id>/<model_name>/<YYYY>/<MM>/<DD>/<filename>
+
+Filenames are sanitised (basename extraction) to prevent path-traversal
+attacks from client-supplied names.
+
+Other utility helpers:
+
+- ``get_client_ip(request)`` — extract the originating IP respecting common
+  reverse-proxy headers (``X-Forwarded-For``, ``X-Real-IP``, etc.).
+- ``local_datetime(s, tz)`` — parse an ISO-8601 string and attach a timezone
+  (defaults to ``settings.TIME_ZONE``).
+- ``generate_int_uuid(size=None)`` — generate a numeric UUID suitable for
+  surrogate keys.
+- ``check_perm(user, action, project=None)`` — evaluate a permission codename
+  for a user, with optional project-scoped resolution.  Supports the
+  ``role:<name>`` shorthand for direct role-name matching.
 
 Background Tasks
 ----------------
@@ -664,11 +828,16 @@ Security Notes
 - Never trust raw provider tokens without server-side verification.
 - Keep FIREBASE_CONFIG and OAuth credentials in secure secret storage.
 - Treat NETS_CORE_TESTERS_* as high-risk settings and disable in production unless strictly needed.
+- Set ``NETS_CORE_SECURE_CACHE_KEY`` to a secret distinct from ``SECRET_KEY``
+  when using ``SecureCache`` in production.
+- All secret comparisons in the authentication flow use ``hmac.compare_digest``
+  to eliminate timing-attack surface.
 
 Additional Documentation
 ------------------------
 
 - docs/USAGE_GUIDE.rst
+- CHANGELOG.md
 - CONTRIBUTING.md
 - SECURITY.md
 - CODE_OF_CONDUCT.md

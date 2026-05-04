@@ -265,6 +265,9 @@ def _social_login(request, profile_getter):
 
 
 @request_handler(
+    path="loginWithApple/",
+    name="loginWithApple",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id", type=str),
@@ -280,6 +283,9 @@ def login_with_apple(request):
 
 
 @request_handler(
+    path="loginWithFacebook/",
+    name="loginWithFacebook",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id", type=str),
@@ -295,6 +301,9 @@ def login_with_facebook(request):
 
 
 @request_handler(
+    path="loginWithMicrosoft/",
+    name="loginWithMicrosoft",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id", type=str),
@@ -310,6 +319,9 @@ def login_with_microsoft(request):
 
 
 @request_handler(
+    path="loginWithGithub/",
+    name="loginWithGithub",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id", type=str),
@@ -325,6 +337,9 @@ def login_with_github(request):
 
 
 @request_handler(
+    path="loginWithGoogleSocial/",
+    name="loginWithGoogleSocial",
+    method="POST",
     params=[
         RequestParam("token", type=str),
         RequestParam("client_id", type=str),
