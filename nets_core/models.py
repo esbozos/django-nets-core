@@ -28,7 +28,8 @@ except Exception as e:
 
 class NetsCoreBaseManager(models.Manager):
 
-    def to_json(self, fields: tuple = None):
+    def to_json(self, fields: tuple = None, mode: str = None):
+        # mode accepted for API compatibility with pydantic-style callers (e.g. mode="json") and is unused
         query = self.get_queryset()
         if not query:
             raise ValueError(_("Query must be provided"))
@@ -113,7 +114,8 @@ class NetsCoreBaseModel(models.Model):
 
         return tuple(final_fields)
 
-    def to_json(self, fields: tuple = None):
+    def to_json(self, fields: tuple = None, mode: str = None):
+        # mode accepted for API compatibility with pydantic-style callers (e.g. mode="json") and is unused
         # check if JSON_DATA_FIELDS is present
         if hasattr(self, "JSON_DATA_FIELDS") and not fields:
             if not self.JSON_DATA_FIELDS:

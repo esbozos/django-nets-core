@@ -24,3 +24,4 @@
 - Built-in auth and social endpoints now declare allowed HTTP methods explicitly. Unsupported methods return `405` and include the `Allow` header.
 - README and usage guide now document declarative routes, method guards, route registry, and OpenAPI generation.
 - Added optional OpenAPI settings: `NETS_CORE_OPENAPI_TITLE`, `NETS_CORE_OPENAPI_VERSION`, `NETS_CORE_OPENAPI_DESCRIPTION`, `NETS_CORE_OPENAPI_TAGS`, `NETS_CORE_OPENAPI_MODULES`.
+- `NetsCoreBaseModel.to_json()` and `NetsCoreBaseManager.to_json()` now accept an optional `mode` keyword argument (ignored) to avoid `TypeError` when callers pass `mode="json"`/`mode="python"` as with pydantic-style serializers.

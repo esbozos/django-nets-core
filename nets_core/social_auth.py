@@ -97,7 +97,7 @@ def _oauth_login_response(request, user):
     login(request, user, backend=settings.AUTHENTICATION_BACKENDS[0])
 
     tokens = generate_tokens(user, oauth_app)
-    tokens["user"] = user.to_json(mode="full")
+    tokens["user"] = user.to_json()
     return success_response(tokens)
 
 
