@@ -42,7 +42,55 @@ Design Principles
 - Explicit auth context: all issued app tokens map to oauth2_provider Application.
 - Least surprise responses: standardized success/error envelope.
 - Safe defaults for development: debug verification code behavior is configurable.
-- Auditable model changes: updated_fields tracks changes across core entities.
+- Optional model-change history: updated_fields is not an immutable audit log.
+
+Updated Fields Retention (Unreleased)
+------------------------------------
+
+The source tree supports ``NETS_CORE_UPDATED_FIELDS_MODE`` with these values:
+
+- ``"full"`` (default): preserve the existing per-field lists of changes.
+- ``"last"``: keep only the last change per field when saving an existing row.
+- ``"off"``: skip automatic history tracking and the previous-row SELECT.
+	Existing history is not erased. Use a separate protected audit trail when
+	accountability is required.
+
+The JSON column remains on the abstract model. These options are not available
+in releases preceding this change. No release, change of default, automatic
+data migration or column removal is performed by enabling the source option.
+The existing ``save(update_fields=...)`` persistence semantics are unchanged;
+include ``updated_fields`` explicitly when persisting history in a partial save.
+
+Preview historical retention before writing:
+
+.. code-block:: sh
+
+		python manage.py nets_core_prune_updated_fields --model myapp.MyModel --keep-last 1 --dry-run
+
+After taking and testing a database backup, explicitly acknowledge it:
+
+.. code-block:: sh
+
+		python manage.py nets_core_prune_updated_fields --model myapp.MyModel --keep-last 1 --apply --confirm-backup
+
+``--model`` may be repeated; without it all managed concrete subclasses are
+considered. ``--database`` selects a Django alias and ``--batch-size`` bounds
+each transaction (1..10000). ``--keep-last 0`` can remove all eligible history.
+``--older-than DAYS`` only removes entries older than the cutoff, preserving
+the newest N entries per field and recent/unparseable/ambiguous timestamps.
+
+Reports contain counts and an estimated JSON byte reduction, not recovered
+physical database space or original field values. Invalid structures stop the
+command; earlier applied batches may already be committed. Row locks protect
+each applied batch, not a global snapshot. Review a fresh dry-run first.
+
+The command neither creates backups nor runs VACUUM. A Git checkpoint protects
+code, not deleted history. Rollback of pruned data requires restoring a backup;
+changing the mode back to ``"full"`` does not reconstruct removed entries.
+Schedule PostgreSQL maintenance separately: ordinary VACUUM can reuse space,
+while VACUUM FULL rewrites/locks tables and requires explicit operational planning.
+Other database engines need their own maintenance procedure. Do not use this
+history field as evidence of tamper-resistant auditing or regulatory compliance.
 
 request_handler Best Practices
 ------------------------------

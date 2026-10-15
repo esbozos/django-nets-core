@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- Opt-in `NETS_CORE_UPDATED_FIELDS_MODE`: `full` retains the legacy default,
+  `last` keeps one change per field, and `off` avoids automatic tracking and
+  its previous-row SELECT. No column is removed and existing history is kept
+  unless explicitly pruned.
+- `nets_core_prune_updated_fields`: dry-run by default, model/database selection,
+  keyset batches, retention by count/age, JSON-size estimates, explicit apply
+  and backup acknowledgement. Never creates a backup or runs VACUUM.
+- PostgreSQL regression tests for history compatibility/retention and a scoped
+  Python/Django CI workflow. These tests do not cover every public API/backend.
 - Multi-database backend layer for `to_json` serialization (`nets_core.backends`).
   - `PythonBackend` — universal baseline via Django ORM attribute access, works on every DB engine.
   - `PostgreSQLBackend` — wraps existing stored procedures; auto-falls back to Python if not yet installed.

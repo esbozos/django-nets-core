@@ -1,5 +1,6 @@
 from nets_core.firebase_messages import send_user_device_notification
 from nets_core.models import NetsCoreBaseModel, VerificationCode
+from nets_core.history import prune_history, updated_fields_mode
 from django.db.models.signals import (
     post_delete,
     post_save,
@@ -26,11 +27,20 @@ def pre_save_base_model_handler(sender, instance, **kwargs):
         return  # created
 
     if issubclass(sender, NetsCoreBaseModel):
+        if kwargs.get("raw"):
+            return
+        mode = updated_fields_mode()
+        if mode == "off":
+            return
+        if instance.updated_fields is None:
+            instance.updated_fields = {}
+        if mode == "last":
+            instance.updated_fields, _removed = prune_history(instance.updated_fields)
         # NetsCoreBaseModel implements updated_fields property to track fields that have changed
         # is a dict of field_name: [{'old': old_value, 'new': new_value, 'time': time}]
         untracked_fields = ["password", "token", "updated_fields"]
         try:
-            previous_instance = sender.objects.get(pk=instance.pk)
+            previous_instance = sender.objects.using(kwargs.get("using", "default")).get(pk=instance.pk)
         except sender.DoesNotExist:
             return
         for field in instance._meta.fields:
@@ -72,13 +82,15 @@ def pre_save_base_model_handler(sender, instance, **kwargs):
                     continue
 
                 if old_value != new_value:
-                    instance.updated_fields[field_name].append(
-                        {
-                            "old": old_value,
-                            "new": new_value,
-                            "time": str(timezone.now()),
-                        }
-                    )
+                    change = {
+                        "old": old_value,
+                        "new": new_value,
+                        "time": str(timezone.now()),
+                    }
+                    if mode == "last":
+                        instance.updated_fields[field_name] = [change]
+                    else:
+                        instance.updated_fields[field_name].append(change)
 
 
 @receiver(post_save, sender=VerificationCode)

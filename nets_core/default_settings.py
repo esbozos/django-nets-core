@@ -1,3 +1,5 @@
+NETS_CORE_UPDATED_FIELDS_MODE = 'full'
+
 NETS_CORE_PROTECTED_FIELDS = [
     'password',
     'is_active',
